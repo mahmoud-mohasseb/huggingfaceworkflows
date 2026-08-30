@@ -14,7 +14,7 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -38,7 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
       </head>
-      <body className="antialiased font-sans selection:bg-violet-500 selection:text-white min-h-screen">
+      <body className="antialiased font-sans selection:bg-violet-500 selection:text-white min-h-screen" suppressHydrationWarning>
         <ThemeProvider>
           {children}
         </ThemeProvider>

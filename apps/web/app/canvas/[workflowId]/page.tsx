@@ -37,7 +37,7 @@ const INITIAL_WORKFLOW: Workflow = {
   id: 'wf_telegram_ai_bot',
   name: 'Telegram AI Customer Bot Workflow',
   status: 'active',
-  updatedAt: new Date().toISOString(),
+  updatedAt: '2026-08-30T00:00:00.000Z',
   hfDatasetPath: 'datasets/mahmoud-mohasseb/my-ai-userdata',
   commitHash: '8f3a92b',
   creditBalance: 1250,
@@ -772,17 +772,6 @@ export default function CanvasStudioPage({ params }: { params: { workflowId: str
     input.click();
   };
 
-  if (!isMounted) {
-    return (
-      <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950 items-center justify-center text-slate-400 font-mono text-xs select-none">
-        <div className="flex items-center gap-3 bg-slate-900/80 border border-slate-800 p-4 rounded-2xl shadow-2xl">
-          <div className="w-5 h-5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-slate-200 font-semibold">Initializing Canvas Studio...</span>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950">
       {/* Top Navigation Bar */}
@@ -823,21 +812,30 @@ export default function CanvasStudioPage({ params }: { params: { workflowId: str
 
         {/* Main Visual Flow Canvas */}
         <main className="flex-1 h-full relative">
-          <WorkflowCanvas
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onNodeSelect={(id) => setSelectedNodeId(id)}
-            onAddNodeAtPosition={(type, pos) => handleAddNode(type, pos)}
-            onDeleteEdge={handleDeleteEdge}
-            onRunSingleNode={handleTestSingleNode}
-            onDuplicateNode={handleDuplicateNode}
-            onToggleDisableNode={handleToggleDisableNode}
-            onDeleteNode={handleDeleteNode}
-            isExecuting={isExecuting}
-          />
+          {isMounted ? (
+            <WorkflowCanvas
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              onNodeSelect={(id) => setSelectedNodeId(id)}
+              onAddNodeAtPosition={(type, pos) => handleAddNode(type, pos)}
+              onDeleteEdge={handleDeleteEdge}
+              onRunSingleNode={handleTestSingleNode}
+              onDuplicateNode={handleDuplicateNode}
+              onToggleDisableNode={handleToggleDisableNode}
+              onDeleteNode={handleDeleteNode}
+              isExecuting={isExecuting}
+            />
+          ) : (
+            <div className="flex-1 h-full flex items-center justify-center bg-slate-950 text-slate-400 font-mono text-xs select-none">
+              <div className="flex items-center gap-3 bg-slate-900/80 border border-slate-800 p-4 rounded-2xl shadow-2xl">
+                <div className="w-5 h-5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+                <span className="text-slate-200 font-semibold">Initializing Canvas Studio...</span>
+              </div>
+            </div>
+          )}
         </main>
 
         {/* Right Node Inspector Panel */}
