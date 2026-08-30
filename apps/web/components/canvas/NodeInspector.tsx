@@ -23,6 +23,7 @@ import {
   BookOpen,
   ChevronDown,
   ChevronUp,
+  Save,
 } from 'lucide-react';
 import { NodeData } from '../../../../packages/shared-types';
 import { NODE_REGISTRY } from '../../lib/nodeRegistry';
@@ -57,6 +58,7 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
   const [userModels, setUserModels] = useState<any[]>([]);
   const [showHFGuide, setShowHFGuide] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
   const { hfToken } = useAuthStore();
 
   useEffect(() => {
@@ -127,10 +129,28 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
 
         {/* Header Action Toolbar */}
         <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => {
+              onUpdateConfig(nodeId, { ...config });
+              setIsSaved(true);
+              setTimeout(() => setIsSaved(false), 2000);
+            }}
+            className={`px-2.5 py-1.5 rounded-xl transition-all flex items-center gap-1 text-[11px] font-bold shadow-sm ${
+              isSaved
+                ? 'bg-emerald-600 text-white'
+                : 'bg-violet-600 hover:bg-violet-500 text-white shadow-violet-600/30'
+            }`}
+            title="Apply Node Configuration"
+          >
+            {isSaved ? <Check className="w-3.5 h-3.5" /> : <Save className="w-3.5 h-3.5" />}
+            <span>{isSaved ? 'Applied' : 'Apply'}</span>
+          </button>
+
           {onRunSingleNode && (
             <button
               onClick={() => onRunSingleNode(nodeId)}
-              className="p-2 text-violet-400 hover:text-white hover:bg-violet-600/30 rounded-xl transition-colors flex items-center gap-1 text-[10px] font-bold"
+              className="p-2 text-amber-400 hover:text-white hover:bg-amber-600/30 rounded-xl transition-colors flex items-center gap-1 text-[10px] font-bold"
               title="Test Single Node"
             >
               <Play className="w-3.5 h-3.5 fill-current" />
@@ -210,6 +230,51 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
         {/* Tab 1: Parameters Schema Form */}
         {activeTab === 'params' && (
           <div className="space-y-4">
+            {/* Prominent Quick Apply & Test Banner */}
+            <div className="bg-gradient-to-r from-violet-950/70 via-slate-900/90 to-amber-950/50 border border-violet-500/40 rounded-2xl p-3.5 space-y-2.5 shadow-lg">
+              <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-1.5 font-bold text-slate-100">
+                  <Sliders className="w-4 h-4 text-violet-400" />
+                  <span>Node Settings</span>
+                </div>
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" /> Ready
+                </span>
+              </div>
+
+              <div className="text-[10px] font-mono text-slate-300 truncate">
+                Active Model: <span className="text-amber-300 font-bold">{currentModelId}</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onUpdateConfig(nodeId, { ...config });
+                    setIsSaved(true);
+                    setTimeout(() => setIsSaved(false), 2000);
+                  }}
+                  className="py-2 px-3 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-bold shadow-md shadow-violet-600/30 transition-all flex items-center justify-center gap-1.5"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>{isSaved ? 'Applied! ✅' : 'Apply Changes'}</span>
+                </button>
+
+                {onRunSingleNode && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onUpdateConfig(nodeId, { ...config });
+                      onRunSingleNode(nodeId);
+                    }}
+                    className="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                  >
+                    <Play className="w-3.5 h-3.5 text-amber-400 fill-current" />
+                    <span>Test Node</span>
+                  </button>
+                )}
+              </div>
+            </div>
             {/* HF Model Step-by-Step Guide Drawer */}
             {matchedModelGuide && (
               <div className="bg-slate-900/90 border border-violet-500/30 rounded-2xl p-3.5 space-y-2.5 shadow-md">
@@ -429,6 +494,22 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
                 </div>
               );
             })}
+
+            {/* Bottom Form Apply Button */}
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  onUpdateConfig(nodeId, { ...config });
+                  setIsSaved(true);
+                  setTimeout(() => setIsSaved(false), 2000);
+                }}
+                className="w-full py-2.5 bg-gradient-to-r from-violet-600 via-indigo-600 to-amber-600 hover:from-violet-500 hover:to-amber-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-violet-600/30 transition-all flex items-center justify-center gap-2"
+              >
+                <Save className="w-4 h-4" />
+                <span>{isSaved ? 'Configuration Applied & Saved! ✅' : 'Apply & Save Node Parameters'}</span>
+              </button>
+            </div>
           </div>
         )}
 
