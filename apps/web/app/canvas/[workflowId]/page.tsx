@@ -587,13 +587,17 @@ export default function CanvasStudioPage({ params }: { params: { workflowId: str
   };
 
   const handleDeleteNode = (nodeId: string) => {
+    if (selectedNodeId === nodeId) {
+      setSelectedNodeId(null);
+    }
     setNodes((nds) => nds.filter((n) => n.id !== nodeId));
     setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId));
-    if (selectedNodeId === nodeId) setSelectedNodeId(null);
+    deleteNode(nodeId);
   };
 
   const handleDeleteEdge = (edgeId: string) => {
     setEdges((eds) => eds.filter((e) => e.id !== edgeId));
+    deleteEdge(edgeId);
   };
 
   const handleDuplicateNode = (nodeId: string) => {

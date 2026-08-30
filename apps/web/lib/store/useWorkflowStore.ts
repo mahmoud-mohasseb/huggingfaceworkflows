@@ -30,7 +30,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     id: 'wf_telegram_ai_bot',
     name: 'Telegram AI Customer Bot Workflow',
     status: 'active',
-    updatedAt: new Date().toISOString(),
+    updatedAt: '2026-08-30T00:00:00.000Z',
     hfDatasetPath: 'datasets/mahmoud-mohasseb/hf-workflow-data',
     commitHash: '8f3a92b',
     creditBalance: 1250,

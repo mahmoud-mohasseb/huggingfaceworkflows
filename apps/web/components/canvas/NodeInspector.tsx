@@ -56,6 +56,7 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
   const [activeField, setActiveField] = useState<string | null>(null);
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
   const [userModels, setUserModels] = useState<any[]>([]);
+  const [showHFGuide, setShowHFGuide] = useState(false);
   const { hfToken } = useAuthStore();
 
   useEffect(() => {
@@ -73,7 +74,7 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
   const targetNode = nodes.find((n) => n.id === nodeId);
   if (!targetNode) return null;
 
-  const data = targetNode.data as NodeData;
+  const data = (targetNode.data || {}) as NodeData;
   const nodeDef = NODE_REGISTRY[data.type as keyof typeof NODE_REGISTRY];
   const config = data.config || {};
 
@@ -102,8 +103,6 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
   const toggleSecret = (field: string) => {
     setShowSecrets((prev) => ({ ...prev, [field]: !prev[field] }));
   };
-
-  const [showHFGuide, setShowHFGuide] = useState(false);
 
   const currentModelId = config.model_id || config.model || (data.type === 'hf_image_gen' ? 'black-forest-labs/FLUX.1-schnell' : data.type === 'hf_video_gen' ? 'cerspense/zeroscope_v2_576w' : data.type === 'hf_music_gen' ? 'facebook/musicgen-small' : data.type === 'hf_speech_to_text' ? 'openai/whisper-large-v3' : data.type === 'openclaw_agent' ? 'openclaw/openclaw' : 'meta-llama/Llama-3.3-70B-Instruct');
 
