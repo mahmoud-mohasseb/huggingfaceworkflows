@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation';
+import TokenLoginPage from './(auth)/login/page';
 
 export default function HomePage() {
-  redirect('/canvas/wf_telegram_ai_bot');
+  return <TokenLoginPage />;
 }

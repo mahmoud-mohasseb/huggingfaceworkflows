@@ -23,14 +23,8 @@ interface AuthState {
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
-      user: {
-        username: 'mahmoud-mohasseb',
-        fullname: 'Mahmoud Mohasseb',
-        avatarUrl: 'https://huggingface.co/avatars/2cf001.png',
-        datasetPath: 'datasets/mahmoud-mohasseb/hf-workflow-data',
-        creditBalance: 1250,
-      },
-      isAuthenticated: true,
+      user: null,
+      isAuthenticated: false,
       hfToken: null,
 
       setAuthUser: (user, token) =>
