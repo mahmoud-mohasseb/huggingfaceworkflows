@@ -571,7 +571,11 @@ export default function CanvasStudioPage({ params }: { params: { workflowId: str
     setNodes((nds) =>
       nds.map((n) => {
         if (n.id === nodeId) {
-          const newSubtitle = updatedConfig.model_id || updatedConfig.space_slug || (n.data as any).subtitle;
+          const newSubtitle =
+            updatedConfig.model_id ||
+            updatedConfig.model ||
+            updatedConfig.space_slug ||
+            (n.data as any).subtitle;
           return {
             ...n,
             data: {
@@ -584,6 +588,7 @@ export default function CanvasStudioPage({ params }: { params: { workflowId: str
         return n;
       })
     );
+    useWorkflowStore.getState().updateNodeConfig(nodeId, updatedConfig);
   };
 
   const handleDeleteNode = (nodeId: string) => {
@@ -705,9 +710,13 @@ export default function CanvasStudioPage({ params }: { params: { workflowId: str
       nds.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, status: 'running' } } : n))
     );
 
+    const hfToken = useAuthStore.getState().hfToken;
+
     const result = await executeWorkflow({
       nodes: [target],
       edges: [],
+      hfToken,
+      userInputs: { hfToken },
       onStepStart: (id) => {
         setNodes((nds) =>
           nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, status: 'running' } } : n))
@@ -727,6 +736,13 @@ export default function CanvasStudioPage({ params }: { params: { workflowId: str
                   },
                 }
               : n
+          )
+        );
+      },
+      onStepError: (id, error) => {
+        setNodes((nds) =>
+          nds.map((n) =>
+            n.id === id ? { ...n, data: { ...n.data, status: 'failed', error } } : n
           )
         );
       },

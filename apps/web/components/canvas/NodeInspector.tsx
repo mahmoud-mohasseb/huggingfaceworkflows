@@ -503,6 +503,30 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
           </div>
         )}
       </div>
+
+      {/* Sticky Bottom Action Footer */}
+      <div className="p-3 border-t border-slate-800/80 bg-slate-950/95 flex flex-col gap-2 shrink-0">
+        <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
+          <span className="truncate max-w-[200px]" title={currentModelId}>
+            Config: <code className="text-amber-300 font-bold">{currentModelId.split('/').pop()}</code>
+          </span>
+          <span className="text-emerald-400 flex items-center gap-1 font-bold">
+            <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Applied
+          </span>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            onUpdateConfig(nodeId, { ...config });
+            if (onRunSingleNode) onRunSingleNode(nodeId);
+          }}
+          className="w-full py-2.5 bg-gradient-to-r from-violet-600 via-indigo-600 to-amber-600 hover:from-violet-500 hover:to-amber-500 text-white rounded-xl text-xs font-bold shadow-md shadow-violet-600/30 transition-all flex items-center justify-center gap-1.5"
+        >
+          <Play className="w-3.5 h-3.5 fill-current" />
+          <span>Apply & Test Node with Model</span>
+        </button>
+      </div>
     </aside>
   );
 };
