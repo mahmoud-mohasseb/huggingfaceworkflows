@@ -126,7 +126,7 @@ export default function TokenLoginPage() {
             </form>
 
             {/* 1-Click Fast Instant Demo Mode */}
-            <div className="pt-2 border-t border-slate-800/80">
+            <div className="pt-2 border-t border-slate-800/80 space-y-2">
               <button
                 type="button"
                 onClick={handleEnterDemoMode}
@@ -135,6 +135,14 @@ export default function TokenLoginPage() {
                 <Sparkles className="w-4 h-4 text-amber-400" />
                 <span>Try Instant Demo & Explore Canvas Studio</span>
               </button>
+
+              <Link
+                href="/guide"
+                className="w-full py-2 px-3 rounded-xl bg-slate-950 hover:bg-slate-900 border border-slate-800 hover:border-amber-500/40 text-slate-300 hover:text-amber-300 text-xs font-medium transition-all flex items-center justify-center gap-1.5"
+              >
+                <BookOpen className="w-3.5 h-3.5 text-amber-400" />
+                <span>📖 View HF Ecosystem & Integration Master Guide</span>
+              </Link>
             </div>
 
             {/* Step-by-Step Onboarding Token Guide */}

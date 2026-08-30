@@ -55,12 +55,21 @@ export default function WorkflowsDashboard() {
           </div>
         </div>
 
-        <Link
-          href="/canvas/wf_telegram_ai_bot"
-          className="px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white font-semibold rounded-xl text-sm flex items-center gap-2 shadow-lg shadow-violet-600/30 transition-all"
-        >
-          <Plus className="w-4 h-4" /> Open Canvas Studio
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/guide"
+            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 font-semibold rounded-xl text-sm flex items-center gap-2 transition-all"
+          >
+            <BookOpen className="w-4 h-4 text-amber-400" /> HF Master Guide
+          </Link>
+
+          <Link
+            href="/canvas/wf_telegram_ai_bot"
+            className="px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white font-semibold rounded-xl text-sm flex items-center gap-2 shadow-lg shadow-violet-600/30 transition-all"
+          >
+            <Plus className="w-4 h-4" /> Open Canvas Studio
+          </Link>
+        </div>
       </div>
 
       {/* Section 1: Active Saved Workflows */}

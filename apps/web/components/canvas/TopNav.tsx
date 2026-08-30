@@ -231,13 +231,23 @@ export const TopNav: React.FC<TopNavProps> = ({
         {/* ── RIGHT: Actions ─────────────────────────────────────────── */}
         <div className="flex items-center gap-2 shrink-0">
 
+          {/* HF Master Ecosystem Guide */}
+          <Link
+            href="/guide"
+            title="Hugging Face Ecosystem & Integration Master Guide"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/[0.07] bg-slate-900/60 hover:bg-slate-800/80 hover:border-amber-500/30 text-xs text-slate-400 hover:text-amber-300 transition-all duration-200 font-medium"
+          >
+            <BookOpen className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden lg:inline">HF Guide</span>
+          </Link>
+
           {/* Templates popup */}
           <button
             onClick={() => setShowTemplatesModal(true)}
             title="Browse AI Workflow Templates"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/[0.07] bg-slate-900/60 hover:bg-slate-800/80 hover:border-violet-500/30 text-xs text-slate-400 hover:text-slate-200 transition-all duration-200 font-medium"
           >
-            <BookOpen className="w-3.5 h-3.5 text-cyan-400" />
+            <Layers className="w-3.5 h-3.5 text-cyan-400" />
             <span className="hidden lg:inline">Templates</span>
           </button>
 
