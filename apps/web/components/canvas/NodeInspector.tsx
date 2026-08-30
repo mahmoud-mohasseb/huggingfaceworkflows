@@ -17,14 +17,18 @@ import {
   HelpCircle,
   FileCode,
   Play,
-  Cpu,
   Eye,
   EyeOff,
+  ExternalLink,
+  BookOpen,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { NodeData } from '../../../../packages/shared-types';
 import { NODE_REGISTRY } from '../../lib/nodeRegistry';
 import { getAvailableUpstreamVariables } from '../../lib/engine/variableResolver';
 import { useAuthStore } from '../../lib/store/useAuthStore';
+import { HF_MODEL_CATALOG, HFModelGuide } from '../../lib/huggingface/providers';
 
 interface NodeInspectorProps {
   nodeId: string | null;
@@ -98,6 +102,12 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
   const toggleSecret = (field: string) => {
     setShowSecrets((prev) => ({ ...prev, [field]: !prev[field] }));
   };
+
+  const [showHFGuide, setShowHFGuide] = useState(false);
+
+  const currentModelId = config.model_id || config.model || (data.type === 'hf_image_gen' ? 'black-forest-labs/FLUX.1-schnell' : data.type === 'hf_video_gen' ? 'cerspense/zeroscope_v2_576w' : data.type === 'hf_music_gen' ? 'facebook/musicgen-small' : data.type === 'hf_speech_to_text' ? 'openai/whisper-large-v3' : data.type === 'openclaw_agent' ? 'openclaw/openclaw' : 'meta-llama/Llama-3.3-70B-Instruct');
+
+  const matchedModelGuide = HF_MODEL_CATALOG.find(m => m.id === currentModelId || (typeof currentModelId === 'string' && currentModelId.includes(m.id.split('/')[1])));
 
   return (
     <aside className="w-96 border-l border-slate-800/80 bg-slate-950/95 backdrop-blur-2xl h-full flex flex-col overflow-hidden z-20 shadow-2xl select-none">
@@ -201,6 +211,70 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
         {/* Tab 1: Parameters Schema Form */}
         {activeTab === 'params' && (
           <div className="space-y-4">
+            {/* HF Model Step-by-Step Guide Drawer */}
+            {matchedModelGuide && (
+              <div className="bg-slate-900/90 border border-violet-500/30 rounded-2xl p-3.5 space-y-2.5 shadow-md">
+                <button
+                  type="button"
+                  onClick={() => setShowHFGuide(!showHFGuide)}
+                  className="w-full flex items-center justify-between text-left text-xs font-bold text-violet-300 hover:text-violet-200 transition-colors"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <BookOpen className="w-3.5 h-3.5 text-amber-400" />
+                    <span>🤗 HF Setup Guide ({matchedModelGuide.name})</span>
+                  </span>
+                  {showHFGuide ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                </button>
+
+                {showHFGuide && (
+                  <div className="space-y-3 pt-2 border-t border-violet-500/20 text-[11px] text-slate-300 leading-relaxed animate-in fade-in duration-150">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                        {matchedModelGuide.badge}
+                      </span>
+                      <a
+                        href={matchedModelGuide.hfUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[10px] text-violet-400 hover:underline flex items-center gap-1 font-mono font-bold"
+                      >
+                        <span>View on Hub</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+
+                    <p className="text-slate-300">{matchedModelGuide.summary}</p>
+
+                    <div className="space-y-2">
+                      <div className="font-bold text-slate-200 text-xs">Step-by-Step Setup:</div>
+                      {matchedModelGuide.steps.map((st, i) => (
+                        <div key={i} className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800 space-y-1">
+                          <div className="font-bold text-slate-200 text-[11px]">{st.title}</div>
+                          <div className="text-[10px] text-slate-400">{st.description}</div>
+                          {st.codeSnippet && (
+                            <code className="block bg-slate-900 px-2 py-1 rounded text-[10px] font-mono text-amber-300">
+                              {st.codeSnippet}
+                            </code>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {matchedModelGuide.tips.length > 0 && (
+                      <div className="bg-amber-500/10 border border-amber-500/20 p-2.5 rounded-xl text-[10px] text-amber-300 space-y-1">
+                        <span className="font-bold">💡 Optimization Tips:</span>
+                        <ul className="list-disc list-inside space-y-0.5 text-amber-200/90">
+                          {matchedModelGuide.tips.map((t, i) => (
+                            <li key={i}>{t}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="text-[11px] text-slate-400 leading-relaxed bg-slate-900/60 p-3 rounded-xl border border-slate-800/60 flex items-start gap-2">
               <Info className="w-4 h-4 text-violet-400 shrink-0 mt-0.5" />
               <span>

@@ -12,6 +12,7 @@ import { SpacePreviewModal } from '../../../components/spaces/SpacePreviewModal'
 import { HFSpaceInfo } from '../../../../../packages/shared-types';
 import { useAuthStore } from '../../../lib/store/useAuthStore';
 import { executeOpenClawAgentNode } from '../../../lib/engine/nodes/openclawAgent';
+import { HF_MODEL_CATALOG, HFModelGuide } from '../../../lib/huggingface/providers';
 
 export default function SpacesExplorerPage() {
   const [spaces, setSpaces] = useState<HFSpaceInfo[]>([]);
@@ -21,7 +22,8 @@ export default function SpacesExplorerPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [previewSpace, setPreviewSpace] = useState<HFSpaceInfo | null>(null);
-  const [activeTab, setActiveTab] = useState<'openclaw' | 'all' | 'account_spaces' | 'account_models' | 'account_datasets'>('openclaw');
+  const [activeTab, setActiveTab] = useState<'openclaw' | 'models_guide' | 'all' | 'account_spaces' | 'account_models' | 'account_datasets'>('openclaw');
+  const [modelModalityFilter, setModelModalityFilter] = useState<'all' | 'text' | 'image' | 'video' | 'audio' | 'speech' | 'agent'>('all');
 
   // OpenClaw Interactive Simulator State
   const [simTask, setSimTask] = useState('Search latest AI research in 2025 and write a Python summary script');
@@ -142,6 +144,18 @@ export default function SpacesExplorerPage() {
         </button>
 
         <button
+          onClick={() => setActiveTab('models_guide')}
+          className={`px-4 py-2 rounded-xl transition-all flex items-center gap-2 ${
+            activeTab === 'models_guide'
+              ? 'bg-amber-600 text-white shadow-md shadow-amber-600/40 font-bold'
+              : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+          }`}
+        >
+          <Sparkles className="w-4 h-4 text-amber-300" />
+          <span>AI Models Setup Guides ({HF_MODEL_CATALOG.length})</span>
+        </button>
+
+        <button
           onClick={() => setActiveTab('all')}
           className={`px-4 py-2 rounded-xl transition-all flex items-center gap-2 ${
             activeTab === 'all'
@@ -149,7 +163,7 @@ export default function SpacesExplorerPage() {
               : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
           }`}
         >
-          <Sparkles className="w-4 h-4" />
+          <Layers className="w-4 h-4" />
           <span>All ZeroGPU Spaces ({spaces.length})</span>
         </button>
 
@@ -367,6 +381,177 @@ export default function SpacesExplorerPage() {
                 )}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ══ TAB 2: AI MODELS CONFIGURATION GUIDES (ALL MODALITIES) ══════ */}
+      {activeTab === 'models_guide' && (
+        <div className="space-y-8 animate-in fade-in duration-200">
+          {/* Hero Banner */}
+          <div className="relative overflow-hidden rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-950/40 via-slate-900/90 to-violet-950/30 p-8 shadow-2xl space-y-4">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-mono font-bold">
+              <span>🤗 HUGGING FACE MODEL DIRECTORY & SETUP INSTRUCTIONS</span>
+              <span>•</span>
+              <span>100% FREE SERVERLESS & ZEROGPU</span>
+            </div>
+
+            <h2 className="text-2xl lg:text-3xl font-black tracking-tight text-white">
+              How to Configure & Use Every AI Model in Your Workflows
+            </h2>
+
+            <p className="text-xs lg:text-sm text-slate-300 max-w-3xl leading-relaxed">
+              Every model hosted on Hugging Face can be integrated directly into your visual DAG pipelines. Follow the step-by-step instructions below to verify licenses, configure hyperparameters, bind template variables, and deploy multi-modal workflows with zero hosting costs.
+            </p>
+
+            {/* Modality Filter Pills */}
+            <div className="flex items-center gap-2 pt-2 overflow-x-auto no-scrollbar">
+              {[
+                { id: 'all', label: `All Models (${HF_MODEL_CATALOG.length})`, icon: '🌟' },
+                { id: 'text', label: 'Text & LLMs', icon: '💬' },
+                { id: 'image', label: 'Image Gen', icon: '🎨' },
+                { id: 'video', label: 'Video Gen', icon: '🎥' },
+                { id: 'audio', label: 'Music & Audio', icon: '🎵' },
+                { id: 'speech', label: 'Speech (Whisper)', icon: '🎙️' },
+                { id: 'agent', label: 'Autonomous Agents', icon: '🐾' },
+              ].map((pill) => (
+                <button
+                  key={pill.id}
+                  onClick={() => setModelModalityFilter(pill.id as any)}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
+                    modelModalityFilter === pill.id
+                      ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/30'
+                      : 'bg-slate-900/80 text-slate-400 hover:text-white border border-white/10'
+                  }`}
+                >
+                  <span>{pill.icon}</span>
+                  <span>{pill.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Model Cards Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {HF_MODEL_CATALOG.filter((m) =>
+              (modelModalityFilter === 'all' || m.modality === modelModalityFilter) &&
+              (searchQuery === '' || m.name.toLowerCase().includes(searchQuery.toLowerCase()) || m.id.toLowerCase().includes(searchQuery.toLowerCase()))
+            ).map((model) => (
+              <div
+                key={model.id}
+                className="bg-slate-900/90 border border-slate-800 hover:border-violet-500/50 rounded-3xl p-6 shadow-xl transition-all flex flex-col justify-between space-y-5"
+              >
+                <div className="space-y-4">
+                  {/* Card Header */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 rounded-full">
+                          {model.badge}
+                        </span>
+                        {model.isGated ? (
+                          <span className="text-[10px] font-mono font-bold text-violet-400 bg-violet-500/10 border border-violet-500/20 px-2 py-0.5 rounded-full">
+                            Gated • Free Acknowledge
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                            100% Open Access
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="text-base font-bold text-slate-100 mt-2">{model.name}</h3>
+                      <div className="text-xs text-violet-300 font-mono mt-0.5">{model.id}</div>
+                    </div>
+
+                    <a
+                      href={model.hfUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="p-2 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl text-slate-400 hover:text-white transition-colors shrink-0"
+                      title="Open on Hugging Face Hub"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  </div>
+
+                  {/* Summary & Endpoint */}
+                  <p className="text-xs text-slate-300 leading-relaxed">{model.summary}</p>
+
+                  <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 font-mono text-[10px] text-slate-400 flex items-center justify-between">
+                    <span className="truncate">Endpoint: <code className="text-amber-300">{model.apiEndpoint}</code></span>
+                    <button
+                      onClick={() => copyToClipboard(model.apiEndpoint, `ep_${model.id}`)}
+                      className="p-1 text-slate-500 hover:text-slate-200 ml-2"
+                      title="Copy Endpoint"
+                    >
+                      {copied === `ep_${model.id}` ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+
+                  {/* Step-by-Step Instructions */}
+                  <div className="space-y-2 pt-1">
+                    <div className="font-bold text-slate-200 text-xs flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Step-by-Step Configuration Guide:</span>
+                    </div>
+
+                    <div className="space-y-2">
+                      {model.steps.map((step, idx) => (
+                        <div key={idx} className="p-3 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-1">
+                          <div className="font-bold text-slate-200 text-[11px]">{step.title}</div>
+                          <div className="text-[10px] text-slate-400 leading-relaxed">{step.description}</div>
+                          {step.codeSnippet && (
+                            <div className="mt-1 flex items-center justify-between bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800 text-[10px] font-mono text-amber-300">
+                              <code>{step.codeSnippet}</code>
+                              <button
+                                onClick={() => copyToClipboard(step.codeSnippet!, `code_${model.id}_${idx}`)}
+                                className="text-slate-500 hover:text-slate-200 ml-2"
+                              >
+                                {copied === `code_${model.id}_${idx}` ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Parameter Recommendations */}
+                  <div className="p-3 rounded-xl bg-violet-950/20 border border-violet-500/20 space-y-1.5 text-[10px] font-mono">
+                    <div className="text-violet-300 font-bold uppercase">⚙️ Recommended Parameter Presets:</div>
+                    <div className="text-slate-300 grid grid-cols-2 gap-1">
+                      {Object.entries(model.recommendedConfig).map(([k, v]) => (
+                        <div key={k} className="truncate">
+                          <span className="text-slate-500">{k}:</span> <span className="text-amber-300 font-bold">{String(v)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Tips */}
+                  {model.tips && model.tips.length > 0 && (
+                    <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/20 text-[10px] text-amber-200/90 space-y-1">
+                      <div className="font-bold text-amber-300">💡 Optimization Tips:</div>
+                      <ul className="list-disc list-inside space-y-0.5">
+                        {model.tips.map((tip, i) => (
+                          <li key={i}>{tip}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
+                {/* Quick Add Button */}
+                <button
+                  type="button"
+                  onClick={() => (window.location.href = `/canvas/wf_telegram_ai_bot?add_model=${encodeURIComponent(model.id)}`)}
+                  className="w-full py-2.5 bg-gradient-to-r from-amber-500 via-orange-500 to-violet-600 hover:from-amber-400 hover:to-violet-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2"
+                >
+                  <Zap className="w-3.5 h-3.5 text-white" />
+                  <span>Use {model.name.split(' ')[0]} in Workflow Canvas</span>
+                </button>
+              </div>
+            ))}
           </div>
         </div>
       )}
