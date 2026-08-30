@@ -3,12 +3,27 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useNodesState, useEdgesState, addEdge, Connection, Edge, Node } from '@xyflow/react';
+import dynamic from 'next/dynamic';
 import { TopNav } from '../../../components/canvas/TopNav';
 import { NodeSidebar } from '../../../components/canvas/NodeSidebar';
-import { WorkflowCanvas } from '../../../components/canvas/WorkflowCanvas';
 import { NodeInspector } from '../../../components/canvas/NodeInspector';
 import { ExecutionDrawer } from '../../../components/canvas/ExecutionDrawer';
 import { CommandPalette } from '../../../components/canvas/CommandPalette';
+
+const WorkflowCanvas = dynamic(
+  () => import('../../../components/canvas/WorkflowCanvas').then((mod) => mod.WorkflowCanvas),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex-1 h-full flex items-center justify-center bg-slate-950 text-slate-400 font-mono text-xs">
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+          <span>Loading Visual Canvas...</span>
+        </div>
+      </div>
+    ),
+  }
+);
 
 import { Workflow, NodeData, NodeType, ExecutionResult, RunLog } from '../../../../../packages/shared-types';
 import { NODE_REGISTRY } from '../../../lib/nodeRegistry';
@@ -154,7 +169,12 @@ export default function CanvasStudioPage({ params }: { params: { workflowId: str
   const [activeTab, setActiveTab] = useState<'editor' | 'executions' | 'settings'>('editor');
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isContinuousLive, setIsContinuousLive] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Handle custom template initialization for all 5 pre-built templates
   useEffect(() => {
@@ -751,6 +771,17 @@ export default function CanvasStudioPage({ params }: { params: { workflowId: str
     };
     input.click();
   };
+
+  if (!isMounted) {
+    return (
+      <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950 items-center justify-center text-slate-400 font-mono text-xs select-none">
+        <div className="flex items-center gap-3 bg-slate-900/80 border border-slate-800 p-4 rounded-2xl shadow-2xl">
+          <div className="w-5 h-5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-slate-200 font-semibold">Initializing Canvas Studio...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950">
