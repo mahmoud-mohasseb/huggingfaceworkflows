@@ -9,12 +9,8 @@
 [build.environment]
   NODE_VERSION = "20"
   NPM_FLAGS = "--legacy-peer-deps"
-
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-  conditions = {Role = ["admin"]}
+  NEXT_TELEMETRY_DISABLED = "1"
 
 [context.production.environment]
+  NODE_VERSION = "20"
   NEXT_TELEMETRY_DISABLED = "1"
