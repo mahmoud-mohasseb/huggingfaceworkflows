@@ -206,7 +206,7 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
       </div>
 
       {/* Scrollable Tab Contents */}
-      <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-4 pb-28 overscroll-contain">
+      <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-4 pb-32 overscroll-contain custom-sidebar-scroll">
         {/* Tab 1: Parameters Schema Form */}
         {activeTab === 'params' && (
           <div className="space-y-4">

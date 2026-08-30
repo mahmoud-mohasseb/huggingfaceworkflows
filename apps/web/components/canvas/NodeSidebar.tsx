@@ -213,7 +213,7 @@ export const NodeSidebar: React.FC<NodeSidebarProps> = ({ onAddNode }) => {
           </div>
 
           {/* Node Category List & Results */}
-          <div className="flex-1 overflow-y-auto min-h-0 p-3 space-y-4 pb-24 overscroll-contain">
+          <div className="flex-1 overflow-y-auto min-h-0 p-3 space-y-4 pb-28 overscroll-contain custom-sidebar-scroll">
             {filteredNodes.length === 0 ? (
               <div className="text-center py-8 px-4 space-y-2">
                 <div className="w-8 h-8 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center mx-auto text-slate-500">

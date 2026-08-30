@@ -826,7 +826,7 @@ export default function CanvasStudioPage({ params }: { params: { workflowId: str
       />
 
       {/* Canvas Workspace Layout */}
-      <div className="flex-1 flex overflow-hidden relative">
+      <div className="flex-1 flex overflow-hidden relative min-h-0">
         {/* Left Node Drawer */}
         <NodeSidebar onAddNode={(type) => handleAddNode(type)} />
 
