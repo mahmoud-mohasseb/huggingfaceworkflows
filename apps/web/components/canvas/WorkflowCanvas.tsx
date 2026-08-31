@@ -29,6 +29,7 @@ import { LogicTransformNode } from './nodes/LogicTransformNode';
 import { TelegramReplyNode } from './nodes/TelegramReplyNode';
 import { WhatsAppReplyNode } from './nodes/WhatsAppReplyNode';
 import { OpenClawAgentNode } from './nodes/OpenClawAgentNode';
+import { HFZeroShotNode } from './nodes/HFZeroShotNode';
 import { CustomEdge } from './CustomEdge';
 
 import { NODE_REGISTRY } from '../../lib/nodeRegistry';
@@ -59,6 +60,7 @@ const nodeTypesMap = {
   hf_video_gen: HFVideoGenNode,
   hf_music_gen: HFMusicGenNode,
   hf_speech_to_text: HFRouterNode,
+  hf_zero_shot: HFZeroShotNode,
   openclaw_agent: OpenClawAgentNode,
   logic_transform: LogicTransformNode,
   telegram_reply: TelegramReplyNode,

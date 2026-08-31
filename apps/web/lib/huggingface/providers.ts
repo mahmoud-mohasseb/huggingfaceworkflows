@@ -444,6 +444,66 @@ export const HF_MODEL_CATALOG: HFModelGuide[] = [
       'Pairs seamlessly with Cloudflare R2 bucket storage for instant video caching.',
     ],
   },
+  {
+    id: 'openai/clip-vit-large-patch14',
+    name: 'OpenAI CLIP ViT-Large (Zero-Shot Vision Classifier)',
+    modality: 'image',
+    badge: 'Zero-Shot Vision • CLIP',
+    summary: 'Multi-modal contrastive vision-language model evaluating arbitrary visual concepts on images without training.',
+    hfUrl: 'https://huggingface.co/openai/clip-vit-large-patch14',
+    apiEndpoint: 'https://api-inference.huggingface.co/models/openai/clip-vit-large-patch14',
+    isGated: false,
+    recommendedConfig: {
+      candidate_labels: 'invoice, food, landscape, car, portrait, animal',
+    },
+    steps: [
+      {
+        title: '1. Add Zero-Shot Classifier Node',
+        description: 'Drag the Zero-Shot Classifier node onto your workflow canvas.',
+      },
+      {
+        title: '2. Select Modality & Candidate Visual Tags',
+        description: 'Choose "Zero-Shot Vision & Image Concepts (CLIP)" and specify candidate image categories.',
+      },
+      {
+        title: '3. Connect Inbound Image Attachment',
+        description: 'Link the `media_url` output from WhatsApp or Telegram trigger to the `image_url` input pin.',
+      },
+    ],
+    tips: [
+      'CLIP evaluates images against open-vocabulary natural language phrases with outstanding zero-shot generalization.',
+    ],
+  },
+  {
+    id: 'google/owlvit-base-patch32',
+    name: 'Google OWL-ViT (Zero-Shot Object Detection)',
+    modality: 'image',
+    badge: 'Zero-Shot Detection • OWL-ViT',
+    summary: 'Open-World object detector that locates and places bounding boxes on objects described in natural language text.',
+    hfUrl: 'https://huggingface.co/google/owlvit-base-patch32',
+    apiEndpoint: 'https://api-inference.huggingface.co/models/google/owlvit-base-patch32',
+    isGated: false,
+    recommendedConfig: {
+      candidate_labels: 'person, smartphone, cat, car, laptop, cup',
+    },
+    steps: [
+      {
+        title: '1. Add Zero-Shot Classifier Node',
+        description: 'Place the Zero-Shot Classifier node on the canvas.',
+      },
+      {
+        title: '2. Select Object Detection Modality',
+        description: 'Select "Zero-Shot Object Detection (OWL-ViT)" and provide target object names.',
+      },
+      {
+        title: '3. Retrieve Detected Bounding Boxes',
+        description: 'Access the `detected_objects` JSON output to extract coordinates, bounding boxes, and label probabilities.',
+      },
+    ],
+    tips: [
+      'OWL-ViT detects queries like "a person wearing sunglasses" without needing pre-annotated bounding boxes.',
+    ],
+  },
 ];
 
 export interface AIProvider {

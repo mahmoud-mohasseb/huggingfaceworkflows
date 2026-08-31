@@ -311,7 +311,7 @@ async function runComprehensiveTestSuite() {
   // 5i. Zero-Shot Intent Classifier Pipeline (facebook/bart-large-mnli)
   const zeroShotNodes = [
     { id: 'tg_in', type: 'telegram_trigger', data: { type: 'telegram_trigger', label: 'Telegram Trigger' } },
-    { id: 'zero_shot_1', type: 'hf_zero_shot', data: { type: 'hf_zero_shot', label: 'Zero-Shot Classifier', config: { model_id: 'facebook/bart-large-mnli', candidate_labels: 'billing_refund, technical_issue, spam, sales' } } },
+    { id: 'zero_shot_1', type: 'hf_zero_shot', data: { type: 'hf_zero_shot', label: 'Zero-Shot Classifier', config: { modality: 'text_intent', model_id: 'facebook/bart-large-mnli', candidate_labels: 'billing_refund, technical_issue, spam, sales' } } },
     { id: 'tg_out', type: 'telegram_reply', data: { type: 'telegram_reply', label: 'Telegram Reply' } },
   ];
   const zeroShotEdges = [
@@ -323,10 +323,41 @@ async function runComprehensiveTestSuite() {
     edges: zeroShotEdges,
     userInputs: { text: 'I would like to get a refund for my last invoice' },
   });
-  assert('Zero-Shot AI Classifier executes successfully', zeroShotResult.success);
-  assert('Zero-Shot AI Classifier outputs top predicted label', typeof zeroShotResult.nodeOutputs['zero_shot_1']?.top_label === 'string');
-  assert('Zero-Shot AI Classifier outputs confidence score', typeof zeroShotResult.nodeOutputs['zero_shot_1']?.confidence === 'number');
-  assert('Zero-Shot AI Classifier outputs JSON label scores dictionary', typeof zeroShotResult.nodeOutputs['zero_shot_1']?.scores === 'object');
+  assert('Zero-Shot AI Text Classifier executes successfully', zeroShotResult.success);
+  assert('Zero-Shot AI Text Classifier outputs top predicted label', typeof zeroShotResult.nodeOutputs['zero_shot_1']?.top_label === 'string');
+  assert('Zero-Shot AI Text Classifier outputs confidence score', typeof zeroShotResult.nodeOutputs['zero_shot_1']?.confidence === 'number');
+  assert('Zero-Shot AI Text Classifier outputs JSON label scores dictionary', typeof zeroShotResult.nodeOutputs['zero_shot_1']?.scores === 'object');
+
+  // 5j. Zero-Shot Vision CLIP Concept Classifier Pipeline (openai/clip-vit-large-patch14)
+  const clipNodes = [
+    { id: 'wa_in', type: 'whatsapp_trigger', data: { type: 'whatsapp_trigger', label: 'WhatsApp Trigger' } },
+    { id: 'clip_node', type: 'hf_zero_shot', data: { type: 'hf_zero_shot', label: 'CLIP Vision Classifier', config: { modality: 'vision_clip', model_id: 'openai/clip-vit-large-patch14', candidate_labels: 'invoice_receipt, food_dish, car, landscape' } } },
+    { id: 'wa_out', type: 'whatsapp_reply', data: { type: 'whatsapp_reply', label: 'WhatsApp Reply' } },
+  ];
+  const clipEdges = [
+    { id: 'e1', source: 'wa_in', target: 'clip_node' },
+    { id: 'e2', source: 'clip_node', target: 'wa_out' },
+  ];
+  const clipResult = await executeWorkflow({
+    nodes: clipNodes,
+    edges: clipEdges,
+    userInputs: { image: 'https://images.unsplash.com/photo-1543466835-00a7907e9de1' },
+  });
+  assert('CLIP Zero-Shot Vision Classifier executes successfully', clipResult.success);
+  assert('CLIP Zero-Shot Vision outputs visual concept label', typeof clipResult.nodeOutputs['clip_node']?.top_label === 'string');
+  assert('CLIP Zero-Shot Vision outputs probability confidence', typeof clipResult.nodeOutputs['clip_node']?.confidence === 'number');
+
+  // 5k. Zero-Shot Object Detection Pipeline (google/owlvit-base-patch32)
+  const owlNodes = [
+    { id: 'owl_node', type: 'hf_zero_shot', data: { type: 'hf_zero_shot', label: 'OWL-ViT Detector', config: { modality: 'object_detection', model_id: 'google/owlvit-base-patch32', candidate_labels: 'person, dog, car, laptop' } } },
+  ];
+  const owlResult = await executeWorkflow({
+    nodes: owlNodes,
+    edges: [],
+    userInputs: { image: 'https://images.unsplash.com/photo-1543466835-00a7907e9de1' },
+  });
+  assert('OWL-ViT Zero-Shot Object Detector executes successfully', owlResult.success);
+  assert('OWL-ViT outputs detected bounding box objects', Array.isArray(owlResult.nodeOutputs['owl_node']?.detected_objects));
 
   // ── 6. INBOUND BOT EVENT ROUTER & WEBHOOK SIMULATOR ───────────────────────
   console.log('\n🔹 6. Testing Inbound Bot Event Router & Webhook Simulator:');

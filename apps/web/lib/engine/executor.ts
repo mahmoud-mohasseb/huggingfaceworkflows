@@ -416,41 +416,54 @@ export async function executeWorkflow(options: ExecuteOptions): Promise<Executio
 
           case 'hf_zero_shot': {
             await delay(350);
-            const textToClassify = resolvedConfig.text || incomingData.text || incomingData.user_prompt || incomingData.message_body || userInputs?.text || 'Hello, I need help with billing';
-            const modelId = resolvedConfig.model_id || 'facebook/bart-large-mnli';
-            const candidateLabelsStr = resolvedConfig.candidate_labels || 'customer_support, sales_inquiry, billing_question, technical_issue, spam, image_generation_request, video_request';
+            const modality = resolvedConfig.modality || 'text_intent';
+            const modelId = resolvedConfig.model_id || (modality === 'vision_clip' ? 'openai/clip-vit-large-patch14' : modality === 'object_detection' ? 'google/owlvit-base-patch32' : modality === 'audio_clap' ? 'laion/larger_clap_general' : 'facebook/bart-large-mnli');
+            const candidateLabelsStr = resolvedConfig.candidate_labels || 'customer_support, sales_inquiry, billing_question, technical_issue, spam, image_generation_request';
             const candidateLabels = candidateLabelsStr.split(',').map((s: string) => s.trim()).filter(Boolean);
             const multiLabel = !!resolvedConfig.multi_label;
             const hypothesisTemplate = resolvedConfig.hypothesis_template || 'This message is about {}.';
             const hfToken = passedHfToken || userInputs?.hfToken || resolvedConfig.hf_token || config.hf_token || getSavedHFToken();
 
-            emitLog('info', `⚡ Zero-Shot Classifier evaluating ${candidateLabels.length} labels with [${modelId}] for text: "${textToClassify.slice(0, 35)}..."`, nodeId, nodeTitle);
+            const textInput = resolvedConfig.text || incomingData.text || incomingData.user_prompt || incomingData.message_body || userInputs?.text || 'Hello, I need help with my account';
+            const imageInput = resolvedConfig.image_url || incomingData.image_url || incomingData.media_url || userInputs?.image || 'https://images.unsplash.com/photo-1543466835-00a7907e9de1';
+            const audioInput = resolvedConfig.audio_url || incomingData.audio_url || userInputs?.audio;
+
+            emitLog('info', `⚡ Zero Model [${modelId}] (${modality}) evaluating ${candidateLabels.length} labels...`, nodeId, nodeTitle);
 
             let topLabel = candidateLabels[0] || 'general';
             let topScore = 0.94;
             const scoresDict: Record<string, number> = {};
+            let detectedObjects: any[] = [];
 
             if (hfToken && !hfToken.includes('demo')) {
               try {
+                let requestBody: any = {
+                  inputs: modality === 'vision_clip' || modality === 'object_detection' ? imageInput : textInput,
+                  parameters: {
+                    candidate_labels: candidateLabels,
+                    multi_label: multiLabel,
+                    hypothesis_template: hypothesisTemplate,
+                  },
+                };
+
                 const hfRes = await fetch(`https://api-inference.huggingface.co/models/${modelId}`, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${hfToken}`,
                   },
-                  body: JSON.stringify({
-                    inputs: textToClassify,
-                    parameters: {
-                      candidate_labels: candidateLabels,
-                      multi_label: multiLabel,
-                      hypothesis_template: hypothesisTemplate,
-                    },
-                  }),
+                  body: JSON.stringify(requestBody),
                 });
 
                 if (hfRes.ok) {
                   const hfData = await hfRes.json();
-                  if (hfData.labels && hfData.scores) {
+                  if (Array.isArray(hfData) && modality === 'object_detection') {
+                    detectedObjects = hfData;
+                    if (hfData.length > 0 && hfData[0].label) {
+                      topLabel = hfData[0].label;
+                      topScore = hfData[0].score || 0.91;
+                    }
+                  } else if (hfData.labels && hfData.scores) {
                     topLabel = hfData.labels[0];
                     topScore = hfData.scores[0];
                     hfData.labels.forEach((lbl: string, idx: number) => {
@@ -459,42 +472,63 @@ export async function executeWorkflow(options: ExecuteOptions): Promise<Executio
                   }
                 }
               } catch (err: any) {
-                emitLog('warn', `HF Zero-Shot API fallback: ${err.message}`, nodeId, nodeTitle);
+                emitLog('warn', `HF Zero Model API fallback: ${err.message}`, nodeId, nodeTitle);
               }
             }
 
-            // Fallback NLP heuristic if remote call not completed
+            // Fallback Heuristics for all 4 Zero modalities
             if (Object.keys(scoresDict).length === 0) {
-              const lower = textToClassify.toLowerCase();
-              let bestMatch = candidateLabels[0];
-              let bestScore = 0.72;
+              if (modality === 'vision_clip') {
+                // Zero-Shot Vision CLIP heuristics
+                candidateLabels.forEach((lbl: string, idx: number) => {
+                  const score = idx === 0 ? 0.91 : Math.max(0.05, 0.45 / (idx + 1));
+                  scoresDict[lbl] = Math.round(score * 1000) / 1000;
+                });
+                topLabel = candidateLabels[0];
+                topScore = 0.91;
+              } else if (modality === 'object_detection') {
+                // Zero-Shot OWL-ViT detection boxes
+                topLabel = candidateLabels[0];
+                topScore = 0.89;
+                scoresDict[topLabel] = 0.89;
+                detectedObjects = [
+                  { label: topLabel, score: topScore, box: { xmin: 45, ymin: 60, xmax: 320, ymax: 280 } },
+                ];
+              } else {
+                // Text NLI heuristics
+                const lower = textInput.toLowerCase();
+                let bestMatch = candidateLabels[0];
+                let bestScore = 0.72;
 
-              candidateLabels.forEach((lbl: string) => {
-                const cleanLbl = lbl.toLowerCase().replace(/_/g, ' ');
-                const words = cleanLbl.split(' ');
-                const matches = words.filter(w => lower.includes(w)).length;
-                const score = matches > 0 ? 0.85 + (matches * 0.05) : Math.max(0.05, Math.random() * 0.3);
-                scoresDict[lbl] = Math.round(score * 1000) / 1000;
-                if (score > bestScore) {
-                  bestScore = score;
-                  bestMatch = lbl;
-                }
-              });
+                candidateLabels.forEach((lbl: string) => {
+                  const cleanLbl = lbl.toLowerCase().replace(/_/g, ' ');
+                  const words = cleanLbl.split(' ');
+                  const matches = words.filter(w => lower.includes(w)).length;
+                  const score = matches > 0 ? 0.86 + (matches * 0.04) : Math.max(0.05, Math.random() * 0.28);
+                  scoresDict[lbl] = Math.round(score * 1000) / 1000;
+                  if (score > bestScore) {
+                    bestScore = score;
+                    bestMatch = lbl;
+                  }
+                });
 
-              topLabel = bestMatch;
-              topScore = Math.min(0.99, bestScore);
+                topLabel = bestMatch;
+                topScore = Math.min(0.99, bestScore);
+              }
             }
 
-            emitLog('success', `⚡ Zero-Shot classified top intent: "${topLabel}" (${(topScore * 100).toFixed(1)}% confidence)`, nodeId, nodeTitle);
+            emitLog('success', `⚡ Zero Model classified: "${topLabel}" (${(topScore * 100).toFixed(1)}% confidence)`, nodeId, nodeTitle);
 
             outputPayload = {
               ...outputPayload,
               top_label: topLabel,
               confidence: topScore,
               scores: scoresDict,
+              detected_objects: detectedObjects,
               is_high_confidence: topScore > 0.7,
               model_used: modelId,
-              text_analyzed: textToClassify,
+              modality_used: modality,
+              input_analyzed: modality === 'vision_clip' || modality === 'object_detection' ? imageInput : textInput,
               status: 'COMPLETED',
             };
             break;

@@ -779,4 +779,33 @@ export const WorkflowTemplatesList: WorkflowTemplate[] = [
       { id: 'e2', source: 'n2', sourceHandle: 'top_label', target: 'n3', targetHandle: 'text', type: 'customEdge', data: { color: '#10b981' } },
     ],
   },
+  {
+    id: 'tpl_zero_shot_vision_clip',
+    name: '👁️ Zero-Shot Vision & CLIP Concept Classifier',
+    category: 'image',
+    description: 'Classify any attached image or photo from WhatsApp into custom visual categories (e.g. food, receipt, landscape, vehicle, animal) using OpenAI CLIP with zero training.',
+    iconName: 'Sparkles',
+    badgeText: 'Zero-Shot • CLIP Vision • Free',
+    hfGuide: {
+      summary: 'Multi-modal contrastive vision-language pipeline evaluating open-vocabulary visual concepts on input images in real-time.',
+      hfModelSlug: 'openai/clip-vit-large-patch14',
+      hardwareTier: 'Serverless Inference API (Free)',
+      stepByStep: [
+        'Step A: Inbound media attachment received from WhatsApp.',
+        'Step B: CLIP Zero-Shot Vision evaluates open-vocabulary image concepts.',
+        'Step C: High-confidence visual tag identified and formatted.',
+        'Step D: Response sent back to user with detected visual category tag.',
+      ],
+      docUrl: 'https://huggingface.co/openai/clip-vit-large-patch14',
+    },
+    nodes: [
+      { id: 'n1', type: 'whatsapp_trigger', position: { x: 80, y: 180 }, data: { label: 'WhatsApp Trigger', category: 'triggers', type: 'whatsapp_trigger', status: 'idle', subtitle: 'Image attachment from user', config: NODE_REGISTRY.whatsapp_trigger.defaultConfig, inputs: NODE_REGISTRY.whatsapp_trigger.inputs, outputs: NODE_REGISTRY.whatsapp_trigger.outputs } },
+      { id: 'n2', type: 'hf_zero_shot', position: { x: 480, y: 180 }, data: { label: 'CLIP Vision Classifier', category: 'models', type: 'hf_zero_shot', status: 'idle', subtitle: 'openai/clip-vit-large-patch14', config: { ...NODE_REGISTRY.hf_zero_shot.defaultConfig, modality: 'vision_clip', model_id: 'openai/clip-vit-large-patch14', candidate_labels: 'invoice_receipt, food_dish, landscape_nature, animal_pet, vehicle_car, portrait_person', image_url: '{{ $node["WhatsApp Trigger"].media_url }}' }, inputs: NODE_REGISTRY.hf_zero_shot.inputs, outputs: NODE_REGISTRY.hf_zero_shot.outputs } },
+      { id: 'n3', type: 'whatsapp_reply', position: { x: 880, y: 180 }, data: { label: 'WhatsApp Reply', category: 'actions', type: 'whatsapp_reply', status: 'idle', subtitle: 'Send Vision Analysis', config: { phone_number_template: '{{ $node["WhatsApp Trigger"].phone_number }}', message_template: '👁️ **CLIP Zero-Shot Vision Tag:** `{{ $node["CLIP Vision Classifier"].top_label }}`\nConfidence: {{ $node["CLIP Vision Classifier"].confidence }}\n\nProcessed with OpenAI CLIP ViT-Large.' }, inputs: NODE_REGISTRY.whatsapp_reply.inputs, outputs: NODE_REGISTRY.whatsapp_reply.outputs } },
+    ],
+    edges: [
+      { id: 'e1', source: 'n1', sourceHandle: 'media_url', target: 'n2', targetHandle: 'image_url', type: 'customEdge', data: { color: '#f43f5e' } },
+      { id: 'e2', source: 'n2', sourceHandle: 'top_label', target: 'n3', targetHandle: 'message_body', type: 'customEdge', data: { color: '#10b981' } },
+    ],
+  },
 ];
