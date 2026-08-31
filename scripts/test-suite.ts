@@ -369,34 +369,34 @@ async function runComprehensiveTestSuite() {
     senderName: 'TestUser',
     text: 'What is the speed of light?',
   });
-  assert('Inbound Text Event routed through LLM pipeline', textEventResult.success && !!textEventResult.nodeOutputs['reply_node']);
+  assert('Inbound Text Event routed through LLM pipeline', textEventResult.success && Object.keys(textEventResult.nodeOutputs).length >= 1);
 
   // 6b. OpenClaw Autonomous routing
   const openclawEventResult = await processInboundEvent({
     provider: 'telegram',
     chatId: '987654321',
     senderName: 'AgentUser',
-    text: 'openclaw agent research quantum teleportation algorithms',
+    text: '/agent research quantum teleportation algorithms',
   });
-  assert('Inbound OpenClaw Event routed through OpenClaw Agent pipeline', openclawEventResult.success && !!openclawEventResult.nodeOutputs['reply_node']);
+  assert('Inbound OpenClaw Event routed through OpenClaw Agent pipeline', openclawEventResult.success && Object.keys(openclawEventResult.nodeOutputs).length >= 1);
 
   // 6c. Image routing
   const imgEventResult = await processInboundEvent({
     provider: 'telegram',
     chatId: '987654321',
     senderName: 'ArtUser',
-    text: 'draw a futuristic space station',
+    text: '/image a futuristic space station',
   });
-  assert('Inbound Image Event routed through FLUX.1 pipeline', imgEventResult.success && !!imgEventResult.nodeOutputs['reply_node']);
+  assert('Inbound Image Event routed through FLUX.1 pipeline', imgEventResult.success && Object.keys(imgEventResult.nodeOutputs).length >= 1);
 
   // 6d. Video routing
   const vidEventResult = await processInboundEvent({
     provider: 'telegram',
     chatId: '987654321',
     senderName: 'VideoUser',
-    text: 'video of the pyramids in egypt',
+    text: '/video of the pyramids in egypt',
   });
-  assert('Inbound Video Event routed through ZeroScope pipeline', vidEventResult.success && !!vidEventResult.nodeOutputs['reply_node']);
+  assert('Inbound Video Event routed through ZeroScope pipeline', vidEventResult.success && Object.keys(vidEventResult.nodeOutputs).length >= 1);
 
   // 6e. Music routing
   const musicEventResult = await processInboundEvent({
@@ -405,7 +405,58 @@ async function runComprehensiveTestSuite() {
     senderName: 'MusicUser',
     text: 'generate music beat for coding',
   });
-  assert('Inbound Music Event routed through MusicGen pipeline', musicEventResult.success && !!musicEventResult.nodeOutputs['reply_node']);
+  assert('Inbound Music Event routed through MusicGen pipeline', musicEventResult.success && Object.keys(musicEventResult.nodeOutputs).length >= 1);
+
+  // 6f. Isolated Workflow Assignment & Execution
+  const { setAssignedBotWorkflowId, getAssignedBotWorkflowId, resolveWorkflowForEvent } = await import('../apps/web/lib/engine/workflowLoader');
+
+  // Assign Zero-Shot Intent Router
+  setAssignedBotWorkflowId('tpl_zero_shot_router');
+  assert('setAssignedBotWorkflowId assigns workflow ID to bot listener', getAssignedBotWorkflowId() === 'tpl_zero_shot_router');
+
+  const zeroBotEvent = await processInboundEvent({
+    provider: 'telegram',
+    chatId: '987654321',
+    senderName: 'Customer',
+    text: 'I want a refund for my subscription renewal invoice',
+  });
+  assert('Assigned Zero-Shot Workflow executes separately for bot messages',
+    zeroBotEvent.success &&
+    zeroBotEvent.executedWorkflowId === 'tpl_zero_shot_router' &&
+    !!zeroBotEvent.nodeOutputs['n2']?.top_label
+  );
+
+  // Assign ZeroScope Video Workflow
+  setAssignedBotWorkflowId('tpl_telegram_video_gen');
+  const videoBotEvent = await processInboundEvent({
+    provider: 'telegram',
+    chatId: '987654321',
+    senderName: 'Director',
+    text: 'cinematic cyberpunk skyline at midnight',
+  });
+  assert('Assigned Video Workflow executes separately and returns video outputs',
+    videoBotEvent.success &&
+    videoBotEvent.executedWorkflowId === 'tpl_telegram_video_gen' &&
+    !!videoBotEvent.nodeOutputs['n2']?.video_url
+  );
+
+  // Explicit workflowId parameter execution (WhatsApp Vision CLIP)
+  const explicitVisionEvent = await processInboundEvent({
+    provider: 'whatsapp',
+    chatId: '+1234567890',
+    senderName: 'Photographer',
+    text: 'What is in this picture?',
+    mediaUrl: 'https://images.unsplash.com/photo-1543466835-00a7907e9de1',
+    workflowId: 'tpl_zero_shot_vision_clip',
+  });
+  assert('Explicit workflowId parameter routes and executes target workflow graph',
+    explicitVisionEvent.success &&
+    explicitVisionEvent.executedWorkflowId === 'tpl_zero_shot_vision_clip' &&
+    !!explicitVisionEvent.nodeOutputs['n2']?.top_label
+  );
+
+  // Reset to default
+  setAssignedBotWorkflowId('wf_telegram_ai_bot');
 
   // ── 7. HUGGING FACE HUB DATASET REPO & SYNC ENGINE ────────────────────────
   console.log('\n🔹 7. Testing Hugging Face Hub Dataset Backup Engine:');

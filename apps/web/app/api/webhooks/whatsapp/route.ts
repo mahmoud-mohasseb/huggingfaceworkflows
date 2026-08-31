@@ -38,12 +38,19 @@ export async function POST(req: Request) {
     const authHeader = req.headers.get('authorization');
     const headerToken = authHeader ? authHeader.replace(/^Bearer\s+/i, '').trim() : '';
 
+    const url = new URL(req.url);
+    const requestedWorkflowId = payload?.workflow_id || payload?.workflowId || url.searchParams.get('workflowId') || url.searchParams.get('wf') || undefined;
+
+    const mediaUrl = message.image?.link || message.image?.url || message.video?.link || message.audio?.link || undefined;
+
     const execResult = await processInboundEvent({
       provider: 'whatsapp',
       chatId,
       senderName,
       text,
+      mediaUrl,
       hfToken: headerToken || process.env.HF_TOKEN,
+      workflowId: requestedWorkflowId,
     });
 
     return NextResponse.json({
@@ -52,6 +59,8 @@ export async function POST(req: Request) {
       chat_id: chatId,
       sender_name: senderName,
       inbound_text: text,
+      executedWorkflowId: execResult.executedWorkflowId,
+      executedWorkflowName: execResult.executedWorkflowName,
       execResult,
     });
   } catch (err: any) {

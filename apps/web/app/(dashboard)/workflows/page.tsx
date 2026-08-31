@@ -11,6 +11,25 @@ import { WorkflowTemplatesList } from '../../../lib/templates';
 
 export default function WorkflowsDashboard() {
   const [expandedTplId, setExpandedTplId] = useState<string | null>(null);
+  const [assignedBotWfId, setAssignedBotWfId] = useState<string>('wf_telegram_ai_bot');
+
+  React.useEffect(() => {
+    try {
+      const saved = localStorage.getItem('hf_assigned_bot_workflow_id');
+      if (saved) setAssignedBotWfId(saved);
+    } catch {
+      // fallback
+    }
+  }, []);
+
+  const handleAssignBot = (workflowId: string) => {
+    setAssignedBotWfId(workflowId);
+    try {
+      localStorage.setItem('hf_assigned_bot_workflow_id', workflowId);
+    } catch {
+      // fallback
+    }
+  };
 
   const workflows = [
     {
@@ -33,6 +52,26 @@ export default function WorkflowsDashboard() {
       updatedAt: '2 hours ago',
       category: 'Media Generation',
     },
+    {
+      id: 'tpl_zero_shot_router',
+      name: 'Zero-Shot AI Intent Router Bot',
+      status: 'active',
+      dataset: 'datasets/mahmoud-mohasseb/hf-workflow-data',
+      commitHash: '9c4b11f',
+      nodeCount: 3,
+      updatedAt: 'Just now',
+      category: 'Zero Models',
+    },
+    {
+      id: 'tpl_telegram_video_gen',
+      name: 'ZeroScope AI Video Generation Bot',
+      status: 'active',
+      dataset: 'datasets/mahmoud-mohasseb/hf-workflow-data',
+      commitHash: '7b2a94c',
+      nodeCount: 3,
+      updatedAt: 'Just now',
+      category: 'Video Generation',
+    },
   ];
 
   const toggleTpl = (id: string) => {
@@ -51,7 +90,7 @@ export default function WorkflowsDashboard() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-slate-100">Workflows Studio & Template Hub</h1>
-            <p className="text-xs text-slate-400">Manage Hugging Face connected AI workflow pipelines with step-by-step A-to-Z instructions</p>
+            <p className="text-xs text-slate-400">Manage separate AI workflow pipelines with isolated bot assignment and A-to-Z step guides</p>
           </div>
         </div>
 
@@ -74,54 +113,77 @@ export default function WorkflowsDashboard() {
 
       {/* Section 1: Active Saved Workflows */}
       <div className="space-y-4">
-        <h2 className="text-sm font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
-          <span>Active Saved Workflows</span>
-          <span className="text-xs font-mono text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded border border-violet-500/20">
-            {workflows.length}
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+            <span>Separate Saved Workflows</span>
+            <span className="text-xs font-mono text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded border border-violet-500/20">
+              {workflows.length}
+            </span>
+          </h2>
+          <span className="text-xs text-slate-400">
+            Active Bot Handler: <span className="text-emerald-400 font-mono font-bold">{assignedBotWfId}</span>
           </span>
-        </h2>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {workflows.map((wf) => (
-            <div
-              key={wf.id}
-              className="group bg-slate-900/60 hover:bg-slate-900 border border-slate-800 hover:border-violet-500/50 rounded-2xl p-6 transition-all shadow-xl space-y-4"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <span className="text-[10px] font-mono font-bold text-violet-400 uppercase tracking-wider bg-violet-500/10 px-2 py-0.5 rounded border border-violet-500/20">
-                    {wf.category}
-                  </span>
-                  <h3 className="text-lg font-bold text-slate-100 group-hover:text-violet-300 transition-colors mt-2">
-                    {wf.name}
-                  </h3>
-                </div>
-                <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  {wf.status}
-                </span>
-              </div>
+          {workflows.map((wf) => {
+            const isAssigned = assignedBotWfId === wf.id;
+            return (
+              <div
+                key={wf.id}
+                className={`group bg-slate-900/60 hover:bg-slate-900 border rounded-2xl p-6 transition-all shadow-xl space-y-4 ${
+                  isAssigned ? 'border-emerald-500/60 shadow-emerald-950/40 ring-1 ring-emerald-500/30' : 'border-slate-800 hover:border-violet-500/50'
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <span className="text-[10px] font-mono font-bold text-violet-400 uppercase tracking-wider bg-violet-500/10 px-2 py-0.5 rounded border border-violet-500/20">
+                      {wf.category}
+                    </span>
+                    <h3 className="text-lg font-bold text-slate-100 group-hover:text-violet-300 transition-colors mt-2">
+                      {wf.name}
+                    </h3>
+                  </div>
 
-              <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 font-mono text-xs text-slate-400 space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 text-slate-300">
-                    <Database className="w-3.5 h-3.5 text-violet-400" /> Hugging Face Dataset Sync
-                  </span>
-                  <span className="text-violet-300 font-semibold">#{wf.commitHash}</span>
+                  {isAssigned ? (
+                    <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5 shadow-sm">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      Active Bot
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleAssignBot(wf.id)}
+                      className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-800 hover:bg-emerald-600/20 hover:text-emerald-300 border border-slate-700 hover:border-emerald-500/40 text-slate-300 transition-all flex items-center gap-1"
+                    >
+                      <Zap className="w-3 h-3 text-amber-400" />
+                      <span>Set as Active Bot</span>
+                    </button>
+                  )}
                 </div>
-                <p className="text-[11px] text-slate-500 truncate">{wf.dataset}</p>
-              </div>
 
-              <div className="flex items-center justify-between pt-2 text-xs text-slate-400">
-                <span>{wf.nodeCount} active nodes • Updated {wf.updatedAt}</span>
-                <Link
-                  href={`/canvas/${wf.id}`}
-                  className="text-violet-400 group-hover:text-violet-300 font-semibold flex items-center gap-1 hover:underline"
-                >
-                  Launch Visual Editor <ArrowRight className="w-4 h-4" />
-                </Link>
+                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 font-mono text-xs text-slate-400 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-slate-300">
+                      <Database className="w-3.5 h-3.5 text-violet-400" /> Hugging Face Dataset Sync
+                    </span>
+                    <span className="text-violet-300 font-semibold">#{wf.commitHash}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 truncate">{wf.dataset}</p>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 text-xs text-slate-400">
+                  <span>{wf.nodeCount} active nodes • Updated {wf.updatedAt}</span>
+                  <Link
+                    href={`/canvas/${wf.id}`}
+                    className="text-violet-400 group-hover:text-violet-300 font-semibold flex items-center gap-1 hover:underline"
+                  >
+                    Launch Visual Editor <ArrowRight className="w-4 h-4" />
+                  </Link>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

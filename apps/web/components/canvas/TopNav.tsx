@@ -74,8 +74,31 @@ export const TopNav: React.FC<TopNavProps> = ({
   const [showAIModal, setShowAIModal] = useState(false);
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [assignedBotWfId, setAssignedBotWfId] = useState<string>('wf_telegram_ai_bot');
 
   const { user, logout } = useAuthStore();
+
+  // Load and sync assigned bot workflow ID
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('hf_assigned_bot_workflow_id');
+      if (saved) setAssignedBotWfId(saved);
+    } catch {
+      // fallback
+    }
+  }, []);
+
+  const isCurrentWfAssigned = assignedBotWfId === workflow.id || (assignedBotWfId === 'wf_telegram_ai_bot' && workflow.id === 'tpl_hf_free_all_ai');
+
+  const handleToggleAssignToBot = () => {
+    const nextId = isCurrentWfAssigned ? '' : workflow.id;
+    setAssignedBotWfId(nextId);
+    try {
+      localStorage.setItem('hf_assigned_bot_workflow_id', nextId);
+    } catch {
+      // fallback
+    }
+  };
 
   // Execution Timer
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -230,6 +253,30 @@ export const TopNav: React.FC<TopNavProps> = ({
 
         {/* ── RIGHT: Actions ─────────────────────────────────────────── */}
         <div className="flex items-center gap-2 shrink-0">
+
+          {/* Assign as Active Bot Workflow */}
+          <button
+            type="button"
+            onClick={handleToggleAssignToBot}
+            title={isCurrentWfAssigned ? "This workflow is active and handling your Telegram & WhatsApp bot messages" : "Assign this workflow to handle your Telegram & WhatsApp bot messages"}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all duration-200 ${
+              isCurrentWfAssigned
+                ? 'border-emerald-500/50 bg-emerald-500/20 text-emerald-300 shadow-lg shadow-emerald-950/60'
+                : 'border-white/[0.07] bg-slate-900/60 hover:bg-emerald-600/10 hover:border-emerald-500/30 text-slate-400 hover:text-emerald-300'
+            }`}
+          >
+            {isCurrentWfAssigned ? (
+              <>
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="hidden sm:inline">Active Bot</span>
+              </>
+            ) : (
+              <>
+                <Zap className="w-3.5 h-3.5 text-slate-400" />
+                <span className="hidden sm:inline">Assign to Bot</span>
+              </>
+            )}
+          </button>
 
           {/* HF Master Ecosystem Guide */}
           <Link

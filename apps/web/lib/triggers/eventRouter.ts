@@ -1,118 +1,107 @@
 import { executeWorkflow } from '../engine/executor';
+import { resolveWorkflowForEvent, getAssignedBotWorkflowId, loadWorkflowGraphById } from '../engine/workflowLoader';
+import { Node, Edge } from '@xyflow/react';
 
 export interface MessageEventPayload {
   provider: 'telegram' | 'whatsapp' | 'webhook';
   chatId: string;
   senderName: string;
   text: string;
+  mediaUrl?: string;
   botToken?: string;
   hfToken?: string;
+  workflowId?: string;
 }
 
 export async function processInboundEvent(event: MessageEventPayload) {
-  const t = event.text.toLowerCase();
+  // 1. Resolve which separate workflow is assigned to process this inbound event
+  const resolvedWorkflow = resolveWorkflowForEvent(event.text, event.workflowId);
 
-  const isVideoReq = t.includes('video') || t.includes('clip') || t.includes('movie') || t.includes('animate');
-  const isImageReq = t.includes('image') || t.includes('draw') || t.includes('photo') || t.includes('picture') || t.includes('art') || t.includes('paint');
-  const isMusicReq = t.includes('music') || t.includes('song') || t.includes('audio') || t.includes('track');
-  const isSpeechReq = t.includes('transcribe') || t.includes('voice') || t.includes('speech');
-  const isDeepSeekReq = t.includes('deepseek') || t.includes('reason');
-  const isOpenClawReq = t.includes('openclaw') || t.includes('agent') || t.includes('research') || t.includes('investigate') || t.includes('solve');
+  // Clean prompt without command prefix (e.g. "/image a cat in space" -> "a cat in space")
+  let cleanText = event.text.trim();
+  const commandMatch = cleanText.match(/^(\/[a-zA-Z0-9_]+)\s*(.*)/s);
+  const command = commandMatch ? commandMatch[1] : null;
+  const promptBody = commandMatch && commandMatch[2] ? commandMatch[2].trim() : cleanText;
 
-  let modelNodeType = 'hf_router';
-  let modelId = 'meta-llama/Llama-3.3-70B-Instruct';
-  let outputField = 'response_text';
-  let templateMessage = '🤖 **[HF AI Model]**:\n\n{{ $node["AI Model"].response_text }}';
+  // 2. Clone the workflow's graph to avoid mutation
+  const nodes: Node[] = JSON.parse(JSON.stringify(resolvedWorkflow.nodes));
+  const edges: Edge[] = JSON.parse(JSON.stringify(resolvedWorkflow.edges));
 
-  if (isOpenClawReq) {
-    modelNodeType = 'openclaw_agent';
-    modelId = 'openclaw/openclaw';
-    outputField = 'agent_response';
-    templateMessage = '{{ $node["AI Model"].agent_response }}';
-  } else if (isVideoReq) {
-    modelNodeType = 'hf_video_gen';
-    modelId = 'zeroscope_v2_576w';
-    outputField = 'preview_image_url';
-    templateMessage = '🎥 **[ZeroScope v2 Video Generator]**:\n\nGenerated Video Scene for prompt: "' + event.text + '"!\n\n🖼️ View Image: {{ $node["AI Model"].preview_image_url }}';
-  } else if (isImageReq) {
-    modelNodeType = 'hf_image_gen';
-    modelId = 'black-forest-labs/FLUX.1-schnell';
-    outputField = 'image_url';
-    templateMessage = '🎨 **[FLUX.1 Photorealistic Image Generator]**:\n\nGenerated Image for prompt: "' + event.text + '"!\n\n🖼️ View Image: {{ $node["AI Model"].image_url }}';
-  } else if (isMusicReq) {
-    modelNodeType = 'hf_music_gen';
-    modelId = 'facebook/musicgen-small';
-    outputField = 'audio_url';
-    templateMessage = '🎵 **[MusicGen Stereo Audio Composer]**:\n\nGenerated 10s audio track for prompt: "' + event.text + '"!\n\n🎶 Listen Audio: {{ $node["AI Model"].audio_url }}';
-  } else if (isSpeechReq) {
-    modelNodeType = 'hf_speech_to_text';
-    modelId = 'openai/whisper-large-v3';
-    outputField = 'transcription';
-    templateMessage = '🎤 **[Whisper Speech-to-Text Transcribe]**:\n\nTranscribed Voice: {{ $node["AI Model"].transcription }}';
-  } else if (isDeepSeekReq) {
-    modelNodeType = 'hf_router';
-    modelId = 'deepseek-ai/DeepSeek-R1-Distill-Qwen-32B';
-    outputField = 'response_text';
-    templateMessage = '🧠 **[DeepSeek R1 Reasoning Model]**:\n\n{{ $node["AI Model"].response_text }}';
-  }
+  // 3. Inject event data into trigger and reply nodes
+  nodes.forEach((node) => {
+    const nodeType = (node.data as any)?.type || node.type;
 
-  const nodes = [
-    {
-      id: 'trigger_node',
-      type: `${event.provider}_trigger`,
-      data: {
-        label: `${event.provider.toUpperCase()} Trigger`,
-        type: `${event.provider}_trigger`,
-        category: 'triggers',
-        config: { bot_token: event.botToken, chat_id: event.chatId },
-        lastOutput: { chat_id: event.chatId, text: event.text, sender_name: event.senderName },
-      },
-    },
-    {
-      id: 'model_node',
-      type: modelNodeType,
-      data: {
-        label: 'AI Model',
-        type: modelNodeType,
-        category: 'models',
+    // Inject into Trigger node
+    if (nodeType === 'telegram_trigger' || nodeType === 'whatsapp_trigger') {
+      node.data = {
+        ...node.data,
         config: {
-          model_id: modelId,
-          user_prompt: event.text,
-          prompt_template: event.text,
-          hf_token: event.hfToken,
+          ...(node.data as any)?.config,
+          chat_id: event.chatId,
+          bot_token: event.botToken || (node.data as any)?.config?.bot_token,
         },
-      },
-    },
-    {
-      id: 'reply_node',
-      type: `${event.provider}_reply`,
-      data: {
-        label: `${event.provider.toUpperCase()} Reply`,
-        type: `${event.provider}_reply`,
-        category: 'actions',
+        lastOutput: {
+          chat_id: event.chatId,
+          text: promptBody,
+          raw_text: event.text,
+          command: command || '',
+          sender_name: event.senderName,
+          media_url: event.mediaUrl || (node.data as any)?.lastOutput?.media_url,
+          phone_number: event.chatId,
+          message_body: promptBody,
+        },
+      };
+    }
+
+    // Inject into Reply node
+    if (nodeType === 'telegram_reply' || nodeType === 'whatsapp_reply') {
+      node.data = {
+        ...node.data,
         config: {
-          bot_token: event.botToken,
+          ...(node.data as any)?.config,
+          bot_token: event.botToken || (node.data as any)?.config?.bot_token,
           chat_id_template: event.chatId,
-          message_template: templateMessage,
+          phone_number_template: event.chatId,
         },
-      },
-    },
-  ];
+      };
+    }
 
-  const edges = [
-    { id: 'e1', source: 'trigger_node', sourceHandle: 'text', target: 'model_node', targetHandle: 'user_prompt' },
-    { id: 'e2', source: 'model_node', sourceHandle: outputField, target: 'reply_node', targetHandle: 'text' },
-  ];
+    // Inject prompt and tokens into model nodes if configured with dynamic variables
+    if (
+      nodeType === 'hf_router' ||
+      nodeType === 'hf_image_gen' ||
+      nodeType === 'hf_video_gen' ||
+      nodeType === 'hf_music_gen' ||
+      nodeType === 'hf_zero_shot' ||
+      nodeType === 'openclaw_agent'
+    ) {
+      const cfg = (node.data as any)?.config || {};
+      if (event.hfToken && !cfg.hf_token) {
+        cfg.hf_token = event.hfToken;
+      }
+    }
+  });
 
-  return await executeWorkflow({
+  // 4. Execute the exact isolated workflow DAG
+  const execResult = await executeWorkflow({
     nodes,
     edges,
     hfToken: event.hfToken,
     userInputs: {
       chat_id: event.chatId,
-      text: event.text,
+      text: promptBody,
+      prompt: promptBody,
       sender_name: event.senderName,
+      media_url: event.mediaUrl,
+      image: event.mediaUrl,
       bot_token: event.botToken,
+      hfToken: event.hfToken,
     },
   });
+
+  return {
+    ...execResult,
+    executedWorkflowId: resolvedWorkflow.id,
+    executedWorkflowName: resolvedWorkflow.name,
+  };
 }

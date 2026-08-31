@@ -30,11 +30,13 @@ export async function POST(req: Request) {
 
     const hfToken = payload?.hf_token || payload?.userInputs?.hfToken || headerToken || cookieToken || getSavedHFToken() || '';
 
+    const requestedWorkflowId = payload?.workflow_id || payload?.workflowId || url.searchParams.get('workflowId') || url.searchParams.get('wf') || undefined;
+
     if (!chatId) {
       return NextResponse.json({ status: 'no_chat_id' });
     }
 
-    // Process inbound message through multi-modal event router
+    // Process inbound message through the assigned / resolved separate workflow
     const execResult = await processInboundEvent({
       provider: 'telegram',
       chatId: String(chatId),
@@ -42,16 +44,36 @@ export async function POST(req: Request) {
       text,
       botToken,
       hfToken,
+      workflowId: requestedWorkflowId,
     });
 
-    const aiOutput = execResult.nodeOutputs?.reply_node?.body_sent ||
-      execResult.nodeOutputs?.model_node?.response_text ||
-      execResult.nodeOutputs?.model_node?.image_url ||
-      execResult.nodeOutputs?.model_node?.audio_url ||
-      `🤖 **[AI Assistant]**: Processed request for "${text.slice(0, 60)}".`;
+    // Find the primary response from the executed workflow graph
+    let aiOutput = '';
+    let modelNodeImage = '';
+    let modelNodeVideo = '';
+    let modelNodeAudio = '';
 
-    const modelNodeAudio = execResult.nodeOutputs?.model_node?.audio_url;
-    const modelNodeImage = execResult.nodeOutputs?.model_node?.image_url || execResult.nodeOutputs?.model_node?.preview_image_url;
+    if (execResult.nodeOutputs) {
+      for (const [nodeId, out] of Object.entries(execResult.nodeOutputs)) {
+        if (!out) continue;
+        if (out.body_sent) aiOutput = out.body_sent;
+        else if (out.response_text && !aiOutput) aiOutput = out.response_text;
+        else if (out.agent_response && !aiOutput) aiOutput = out.agent_response;
+        else if (out.transcription && !aiOutput) aiOutput = `🎙️ **Transcription**: ${out.transcription}`;
+        else if (out.top_label && !aiOutput) {
+          aiOutput = `🎯 **[Zero Model Result]**:\n- **Intent/Concept**: \`${out.top_label}\`\n- **Confidence**: ${(Number(out.confidence || 0) * 100).toFixed(1)}%\n- **Model**: \`${out.model_used || 'Zero-Shot'}\``;
+        }
+
+        if (out.video_url) modelNodeVideo = out.video_url;
+        if (out.image_url) modelNodeImage = out.image_url;
+        if (out.preview_image_url && !modelNodeImage) modelNodeImage = out.preview_image_url;
+        if (out.audio_url) modelNodeAudio = out.audio_url;
+      }
+    }
+
+    if (!aiOutput) {
+      aiOutput = `🤖 **[${execResult.executedWorkflowName || 'AI Bot'}]**: Executed workflow successfully for prompt: "${text.slice(0, 60)}".`;
+    }
 
     // Dispatch message to Telegram Bot API
     let sentToTelegram = false;
@@ -59,7 +81,7 @@ export async function POST(req: Request) {
 
     if (botToken && botToken.includes(':') && !botToken.includes('demo_token')) {
       try {
-        const isVideo = aiOutput.includes('.mp4');
+        const isVideo = !!modelNodeVideo || aiOutput.includes('.mp4');
         const isAudio = !isVideo && (!!modelNodeAudio || aiOutput.includes('.mp3') || aiOutput.includes('.wav') || aiOutput.includes('audio_url') || aiOutput.includes('MusicGen') || aiOutput.includes('SoundHelix'));
         const isPhoto = !isVideo && !isAudio && (!!modelNodeImage || aiOutput.includes('data:image/') || (aiOutput.startsWith('http') && (aiOutput.includes('.png') || aiOutput.includes('.jpg') || aiOutput.includes('pollinations'))));
 
@@ -68,9 +90,9 @@ export async function POST(req: Request) {
 
         if (isVideo) {
           const videoUrlMatch = aiOutput.match(/https?:\/\/[^\s]+\.mp4/);
-          const videoUrl = videoUrlMatch ? videoUrlMatch[0] : 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4';
+          const videoUrl = modelNodeVideo || (videoUrlMatch ? videoUrlMatch[0] : 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4');
           endpoint = 'sendVideo';
-          bodyPayload = { chat_id: chatId, video: videoUrl, caption: `🎥 Generated Video for prompt: "${text}"` };
+          bodyPayload = { chat_id: chatId, video: videoUrl, caption: `🎥 Generated Video for: "${text}"` };
         } else if (isAudio) {
           const audioUrlMatch = aiOutput.match(/https?:\/\/[^\s]+\.(mp3|wav|ogg)/);
           const audioUrl = (modelNodeAudio && modelNodeAudio.startsWith('http'))
@@ -80,7 +102,7 @@ export async function POST(req: Request) {
             : 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
 
           endpoint = 'sendAudio';
-          bodyPayload = { chat_id: chatId, audio: audioUrl, caption: `🎵 Generated Music Track for prompt: "${text}"` };
+          bodyPayload = { chat_id: chatId, audio: audioUrl, caption: `🎵 Generated Audio for: "${text}"` };
         } else if (isPhoto) {
           const photoUrl = (modelNodeImage && modelNodeImage.startsWith('http'))
             ? modelNodeImage
@@ -89,7 +111,7 @@ export async function POST(req: Request) {
             : 'https://image.pollinations.ai/prompt/cyberpunk%20scene';
 
           endpoint = 'sendPhoto';
-          bodyPayload = { chat_id: chatId, photo: photoUrl, caption: `🎨 Generated Image for prompt: "${text}"` };
+          bodyPayload = { chat_id: chatId, photo: photoUrl, caption: `🎨 Generated Image for: "${text}"` };
         }
 
         const tgRes = await fetch(`https://api.telegram.org/bot${botToken}/${endpoint}`, {
