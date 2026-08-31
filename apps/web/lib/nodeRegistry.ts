@@ -442,6 +442,76 @@ export const NODE_REGISTRY: Record<NodeType, NodeDefinition> = {
     },
   },
 
+  hf_zero_shot: {
+    type: 'hf_zero_shot',
+    title: 'Zero-Shot AI Classifier',
+    category: 'models',
+    categoryLabel: 'Zero Models & Routing',
+    description: 'Classify inbound text, messages, or queries into custom arbitrary labels dynamically without any training data.',
+    iconName: 'Zap',
+    accentColor: '#10b981', // Emerald 500
+    badge: 'Free',
+    creditCost: 0,
+    defaultSubtitle: 'facebook/bart-large-mnli (Zero-Shot)',
+    inputs: [
+      { id: 'text', label: 'Input Text / Query', type: 'string', color: '#38bdf8' },
+    ],
+    outputs: [
+      { id: 'top_label', label: 'Top Predicted Label', type: 'string', color: '#10b981' },
+      { id: 'confidence', label: 'Confidence Score (0-1)', type: 'number', color: '#f59e0b' },
+      { id: 'scores', label: 'All Label Scores (JSON)', type: 'object', color: '#a855f7' },
+      { id: 'is_high_confidence', label: 'Is High Confidence (>0.7)', type: 'boolean', color: '#3b82f6' },
+    ],
+    schema: [
+      {
+        id: 'model_id',
+        label: 'Zero-Shot Model',
+        type: 'select',
+        defaultValue: 'facebook/bart-large-mnli',
+        options: [
+          { label: 'BART Large MNLI (Top Zero-Shot Classifier)', value: 'facebook/bart-large-mnli' },
+          { label: 'DistilBERT MNLI (Fast Low-Latency Zero-Shot)', value: 'typeform/distilbert-base-uncased-mnli' },
+          { label: 'DeBERTa v3 Large NLI (Maximum Precision)', value: 'MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli' },
+        ],
+      },
+      {
+        id: 'candidate_labels',
+        label: 'Candidate Labels (Comma separated)',
+        type: 'textarea',
+        defaultValue: 'customer_support, sales_inquiry, billing_question, technical_issue, spam, image_generation_request, video_request',
+        description: 'Define any category labels you want the Zero-Shot model to evaluate against.',
+      },
+      {
+        id: 'multi_label',
+        label: 'Allow Multiple Labels',
+        type: 'boolean',
+        defaultValue: false,
+        description: 'Whether multiple candidate labels can be valid at the same time.',
+      },
+      {
+        id: 'hypothesis_template',
+        label: 'Hypothesis Template',
+        type: 'text',
+        defaultValue: 'This message is about {}.',
+        description: 'The template used by the NLI model to evaluate candidate labels.',
+      },
+      {
+        id: 'hf_token',
+        label: '🤗 HuggingFace Token (hf_...)',
+        type: 'secret',
+        placeholder: 'hf_...',
+        description: 'Optional override. Defaults to session token from /login.',
+      },
+    ],
+    defaultConfig: {
+      model_id: 'facebook/bart-large-mnli',
+      candidate_labels: 'customer_support, sales_inquiry, billing_question, technical_issue, spam, image_generation_request, video_request',
+      multi_label: false,
+      hypothesis_template: 'This message is about {}.',
+      hf_token: '',
+    },
+  },
+
   openclaw_agent: {
     type: 'openclaw_agent',
     title: 'OpenClaw Autonomous AI Agent',

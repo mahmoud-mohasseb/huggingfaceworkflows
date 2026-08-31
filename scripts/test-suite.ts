@@ -133,6 +133,7 @@ async function runComprehensiveTestSuite() {
     'hf_video_gen',
     'hf_music_gen',
     'hf_speech_to_text',
+    'hf_zero_shot',
     'openclaw_agent',
     'gradio_space',
     'logic_transform',
@@ -306,6 +307,26 @@ async function runComprehensiveTestSuite() {
   const logicEdges = [{ id: 'e1', source: 'tg_in', target: 'logic_1' }];
   const logicResult = await executeWorkflow({ nodes: logicNodes, edges: logicEdges });
   assert('JavaScript Logic Transform executes and computes output', logicResult.success);
+
+  // 5i. Zero-Shot Intent Classifier Pipeline (facebook/bart-large-mnli)
+  const zeroShotNodes = [
+    { id: 'tg_in', type: 'telegram_trigger', data: { type: 'telegram_trigger', label: 'Telegram Trigger' } },
+    { id: 'zero_shot_1', type: 'hf_zero_shot', data: { type: 'hf_zero_shot', label: 'Zero-Shot Classifier', config: { model_id: 'facebook/bart-large-mnli', candidate_labels: 'billing_refund, technical_issue, spam, sales' } } },
+    { id: 'tg_out', type: 'telegram_reply', data: { type: 'telegram_reply', label: 'Telegram Reply' } },
+  ];
+  const zeroShotEdges = [
+    { id: 'e1', source: 'tg_in', target: 'zero_shot_1' },
+    { id: 'e2', source: 'zero_shot_1', target: 'tg_out' },
+  ];
+  const zeroShotResult = await executeWorkflow({
+    nodes: zeroShotNodes,
+    edges: zeroShotEdges,
+    userInputs: { text: 'I would like to get a refund for my last invoice' },
+  });
+  assert('Zero-Shot AI Classifier executes successfully', zeroShotResult.success);
+  assert('Zero-Shot AI Classifier outputs top predicted label', typeof zeroShotResult.nodeOutputs['zero_shot_1']?.top_label === 'string');
+  assert('Zero-Shot AI Classifier outputs confidence score', typeof zeroShotResult.nodeOutputs['zero_shot_1']?.confidence === 'number');
+  assert('Zero-Shot AI Classifier outputs JSON label scores dictionary', typeof zeroShotResult.nodeOutputs['zero_shot_1']?.scores === 'object');
 
   // ── 6. INBOUND BOT EVENT ROUTER & WEBHOOK SIMULATOR ───────────────────────
   console.log('\n🔹 6. Testing Inbound Bot Event Router & Webhook Simulator:');

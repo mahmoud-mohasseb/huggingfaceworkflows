@@ -9,6 +9,7 @@ export type NodeType =
   | 'hf_music_gen'
   | 'hf_speech_to_text'
   | 'hf_video_gen'
+  | 'hf_zero_shot'
   | 'openclaw_agent'
   | 'logic_transform'
   | 'telegram_reply'

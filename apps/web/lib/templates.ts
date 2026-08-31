@@ -750,4 +750,33 @@ export const WorkflowTemplatesList: WorkflowTemplate[] = [
       { id: 'e2', source: 'n2', sourceHandle: 'video_url', target: 'n3', targetHandle: 'text', type: 'customEdge', data: { color: '#ec4899' } },
     ],
   },
+  {
+    id: 'tpl_zero_shot_router',
+    name: '🧠 Zero-Shot AI Intent Router & Smart Action Pipeline',
+    category: 'reasoning',
+    description: 'Classify any incoming Telegram/WhatsApp message into dynamic arbitrary labels with zero training, routing requests to AI support, image generation, or sales.',
+    iconName: 'Zap',
+    badgeText: 'Zero-Shot • BART MNLI • Free',
+    hfGuide: {
+      summary: 'State-of-the-art Natural Language Inference pipeline evaluating candidate labels in real-time with zero fine-tuning.',
+      hfModelSlug: 'facebook/bart-large-mnli',
+      hardwareTier: 'Serverless Inference API (Free)',
+      stepByStep: [
+        'Step A: Inbound message received from Telegram or WhatsApp.',
+        'Step B: Zero-Shot model evaluates arbitrary candidate labels (support, billing, image_request, video_request).',
+        'Step C: High-confidence prediction triggers tailored downstream action.',
+        'Step D: Response sent back to user with intent category tag.',
+      ],
+      docUrl: 'https://huggingface.co/facebook/bart-large-mnli',
+    },
+    nodes: [
+      { id: 'n1', type: 'telegram_trigger', position: { x: 80, y: 180 }, data: { label: 'Telegram Trigger', category: 'triggers', type: 'telegram_trigger', status: 'idle', subtitle: 'User inquiry message', config: NODE_REGISTRY.telegram_trigger.defaultConfig, inputs: NODE_REGISTRY.telegram_trigger.inputs, outputs: NODE_REGISTRY.telegram_trigger.outputs } },
+      { id: 'n2', type: 'hf_zero_shot', position: { x: 480, y: 180 }, data: { label: 'Zero-Shot Classifier', category: 'models', type: 'hf_zero_shot', status: 'idle', subtitle: 'facebook/bart-large-mnli', config: { ...NODE_REGISTRY.hf_zero_shot.defaultConfig, text: '{{ $node["Telegram Trigger"].text }}' }, inputs: NODE_REGISTRY.hf_zero_shot.inputs, outputs: NODE_REGISTRY.hf_zero_shot.outputs } },
+      { id: 'n3', type: 'telegram_reply', position: { x: 880, y: 180 }, data: { label: 'Telegram Reply', category: 'actions', type: 'telegram_reply', status: 'idle', subtitle: 'Send Routed Response', config: { chat_id_template: '{{ $node["Telegram Trigger"].chat_id }}', message_template: '🎯 **Zero-Shot Intent Detected:** `{{ $node["Zero-Shot Classifier"].top_label }}`\nConfidence: {{ $node["Zero-Shot Classifier"].confidence }}\n\nProcessed with zero-shot model inference.' }, inputs: NODE_REGISTRY.telegram_reply.inputs, outputs: NODE_REGISTRY.telegram_reply.outputs } },
+    ],
+    edges: [
+      { id: 'e1', source: 'n1', sourceHandle: 'text', target: 'n2', targetHandle: 'text', type: 'customEdge', data: { color: '#38bdf8' } },
+      { id: 'e2', source: 'n2', sourceHandle: 'top_label', target: 'n3', targetHandle: 'text', type: 'customEdge', data: { color: '#10b981' } },
+    ],
+  },
 ];

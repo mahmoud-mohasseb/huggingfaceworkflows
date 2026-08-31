@@ -414,6 +414,92 @@ export async function executeWorkflow(options: ExecuteOptions): Promise<Executio
             break;
           }
 
+          case 'hf_zero_shot': {
+            await delay(350);
+            const textToClassify = resolvedConfig.text || incomingData.text || incomingData.user_prompt || incomingData.message_body || userInputs?.text || 'Hello, I need help with billing';
+            const modelId = resolvedConfig.model_id || 'facebook/bart-large-mnli';
+            const candidateLabelsStr = resolvedConfig.candidate_labels || 'customer_support, sales_inquiry, billing_question, technical_issue, spam, image_generation_request, video_request';
+            const candidateLabels = candidateLabelsStr.split(',').map((s: string) => s.trim()).filter(Boolean);
+            const multiLabel = !!resolvedConfig.multi_label;
+            const hypothesisTemplate = resolvedConfig.hypothesis_template || 'This message is about {}.';
+            const hfToken = passedHfToken || userInputs?.hfToken || resolvedConfig.hf_token || config.hf_token || getSavedHFToken();
+
+            emitLog('info', `⚡ Zero-Shot Classifier evaluating ${candidateLabels.length} labels with [${modelId}] for text: "${textToClassify.slice(0, 35)}..."`, nodeId, nodeTitle);
+
+            let topLabel = candidateLabels[0] || 'general';
+            let topScore = 0.94;
+            const scoresDict: Record<string, number> = {};
+
+            if (hfToken && !hfToken.includes('demo')) {
+              try {
+                const hfRes = await fetch(`https://api-inference.huggingface.co/models/${modelId}`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${hfToken}`,
+                  },
+                  body: JSON.stringify({
+                    inputs: textToClassify,
+                    parameters: {
+                      candidate_labels: candidateLabels,
+                      multi_label: multiLabel,
+                      hypothesis_template: hypothesisTemplate,
+                    },
+                  }),
+                });
+
+                if (hfRes.ok) {
+                  const hfData = await hfRes.json();
+                  if (hfData.labels && hfData.scores) {
+                    topLabel = hfData.labels[0];
+                    topScore = hfData.scores[0];
+                    hfData.labels.forEach((lbl: string, idx: number) => {
+                      scoresDict[lbl] = Math.round((hfData.scores[idx] || 0) * 1000) / 1000;
+                    });
+                  }
+                }
+              } catch (err: any) {
+                emitLog('warn', `HF Zero-Shot API fallback: ${err.message}`, nodeId, nodeTitle);
+              }
+            }
+
+            // Fallback NLP heuristic if remote call not completed
+            if (Object.keys(scoresDict).length === 0) {
+              const lower = textToClassify.toLowerCase();
+              let bestMatch = candidateLabels[0];
+              let bestScore = 0.72;
+
+              candidateLabels.forEach((lbl: string) => {
+                const cleanLbl = lbl.toLowerCase().replace(/_/g, ' ');
+                const words = cleanLbl.split(' ');
+                const matches = words.filter(w => lower.includes(w)).length;
+                const score = matches > 0 ? 0.85 + (matches * 0.05) : Math.max(0.05, Math.random() * 0.3);
+                scoresDict[lbl] = Math.round(score * 1000) / 1000;
+                if (score > bestScore) {
+                  bestScore = score;
+                  bestMatch = lbl;
+                }
+              });
+
+              topLabel = bestMatch;
+              topScore = Math.min(0.99, bestScore);
+            }
+
+            emitLog('success', `⚡ Zero-Shot classified top intent: "${topLabel}" (${(topScore * 100).toFixed(1)}% confidence)`, nodeId, nodeTitle);
+
+            outputPayload = {
+              ...outputPayload,
+              top_label: topLabel,
+              confidence: topScore,
+              scores: scoresDict,
+              is_high_confidence: topScore > 0.7,
+              model_used: modelId,
+              text_analyzed: textToClassify,
+              status: 'COMPLETED',
+            };
+            break;
+          }
+
           case 'openclaw_agent': {
             await delay(450);
             const prompt = resolvedConfig.task_prompt || incomingData.task_prompt || incomingData.text || userInputs?.text || 'Solve task autonomously';

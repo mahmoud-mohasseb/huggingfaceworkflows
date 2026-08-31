@@ -378,6 +378,72 @@ export const HF_MODEL_CATALOG: HFModelGuide[] = [
       'Supports custom system prompts and specialized agent roles (Coder, Researcher, Financial Analyst).',
     ],
   },
+  {
+    id: 'facebook/bart-large-mnli',
+    name: 'BART Large MNLI (Zero-Shot Intent Classifier)',
+    modality: 'text',
+    badge: 'Zero-Shot • Intent Router',
+    summary: 'Classifies any text, message, or user query into dynamic arbitrary labels with 0 training data needed.',
+    hfUrl: 'https://huggingface.co/facebook/bart-large-mnli',
+    apiEndpoint: 'https://api-inference.huggingface.co/models/facebook/bart-large-mnli',
+    isGated: false,
+    recommendedConfig: {
+      candidate_labels: 'support, sales, billing, technical_issue, spam, image_generation, video_generation',
+      multi_label: false,
+      hypothesis_template: 'This message is about {}.',
+    },
+    steps: [
+      {
+        title: '1. Add Zero-Shot AI Classifier Node',
+        description: 'Drag the Zero-Shot AI Classifier node onto canvas directly after your Telegram or WhatsApp trigger.',
+      },
+      {
+        title: '2. Specify Candidate Labels',
+        description: 'Type comma-separated category names you want the model to classify messages into.',
+      },
+      {
+        title: '3. Route Downstream Actions by Intent',
+        description: 'Use the `top_label` output to conditionally branch to AI Support, Image Gen, or Human Escalation.',
+      },
+    ],
+    tips: [
+      'Zero-Shot models require no fine-tuning and adapt instantaneously to new categories in real-time.',
+      'Use descriptive label names (e.g. "urgent_billing_issue") for highest classification accuracy.',
+    ],
+  },
+  {
+    id: 'cerspense/zeroscope_v2_576w',
+    name: 'ZeroScope v2 (ZeroGPU Text-to-Video)',
+    modality: 'video',
+    badge: 'ZeroGPU • Text-to-Video',
+    summary: 'High-quality watermark-free text-to-video generation model optimized for free ZeroGPU and serverless inference.',
+    hfUrl: 'https://huggingface.co/cerspense/zeroscope_v2_576w',
+    apiEndpoint: 'https://api-inference.huggingface.co/models/cerspense/zeroscope_v2_576w',
+    isGated: false,
+    recommendedConfig: {
+      fps: 24,
+      num_frames: 24,
+      guidance_scale: 12.5,
+    },
+    steps: [
+      {
+        title: '1. Add HF Free Video Gen Node',
+        description: 'Drag the Video Gen node to your board and select "ZeroScope v2 576w".',
+      },
+      {
+        title: '2. Connect Motion Prompt',
+        description: 'Pipe dynamic text from your chat trigger: e.g. `A high-speed cybernetic drone racing through neon canyons`.',
+      },
+      {
+        title: '3. Deliver Video to Messaging Channels',
+        description: 'Connect the `video_url` output to Telegram or WhatsApp Reply nodes to send playable MP4 clips automatically.',
+      },
+    ],
+    tips: [
+      'ZeroScope produces cinematic 576x320 clips with temporal consistency and zero watermarks.',
+      'Pairs seamlessly with Cloudflare R2 bucket storage for instant video caching.',
+    ],
+  },
 ];
 
 export interface AIProvider {
