@@ -519,6 +519,24 @@ export default function CanvasStudioPage({ params }: { params: { workflowId: str
     };
   }, [isContinuousLive, isExecuting]);
 
+  // Auto-sync canvas graph to backend server so bot webhooks & execution APIs run the exact live workflow
+  useEffect(() => {
+    if (!workflowId || nodes.length === 0) return;
+    const timer = setTimeout(() => {
+      fetch(`/api/workflows/${workflowId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: workflow.name || 'Running Workflow',
+          nodes,
+          edges,
+        }),
+      }).catch((e) => console.warn('Canvas sync:', e));
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [nodes, edges, workflowId, workflow.name]);
+
   const updateWorkflowState = (updated: Partial<Workflow>) => {
     setWorkflow(updated);
   };

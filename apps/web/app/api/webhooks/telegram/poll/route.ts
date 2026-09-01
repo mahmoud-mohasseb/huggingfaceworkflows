@@ -66,17 +66,79 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
-    // Step 2: Send test response to detected Telegram chat
-    const responseText = `🤖 **HF Workflow AI Assistant**:\n\nHello! I successfully connected to your Telegram chat (Chat ID: \`${detectedChatId}\`).\n\nI received: "${latestText}" and processed it via Hugging Face.`;
+    // Step 2: Process inbound event through the authoritative workflow engine
+    const { processInboundEvent } = await import('../../../../../lib/triggers/eventRouter');
+    const { getSavedHFToken } = await import('../../../../../lib/auth/tokenStore');
+    const hfToken = body?.hf_token || getSavedHFToken() || '';
 
-    const tgRes = await fetch(`https://api.telegram.org/bot${bot_token}/sendMessage`, {
+    const execResult = await processInboundEvent({
+      provider: 'telegram',
+      chatId: String(detectedChatId),
+      senderName: 'TelegramUser',
+      text: latestText,
+      botToken: bot_token,
+      hfToken,
+    });
+
+    let aiOutput = '';
+    let modelNodeImage = '';
+    let modelNodeVideo = '';
+    let modelNodeAudio = '';
+
+    if (execResult.nodeOutputs) {
+      for (const [_, out] of Object.entries(execResult.nodeOutputs)) {
+        if (!out) continue;
+        if (out.body_sent) aiOutput = out.body_sent;
+        else if (out.response_text && !aiOutput) aiOutput = out.response_text;
+        else if (out.agent_response && !aiOutput) aiOutput = out.agent_response;
+        else if (out.transcription && !aiOutput) aiOutput = `🎙️ **Transcription**: ${out.transcription}`;
+        else if (out.top_label && !aiOutput) {
+          aiOutput = `🎯 **[Zero Model Result]**:\n- **Intent/Concept**: \`${out.top_label}\`\n- **Confidence**: ${(Number(out.confidence || 0) * 100).toFixed(1)}%\n- **Model**: \`${out.model_used || 'Zero-Shot'}\``;
+        }
+
+        if (out.video_url) modelNodeVideo = out.video_url;
+        if (out.image_url) modelNodeImage = out.image_url;
+        if (out.preview_image_url && !modelNodeImage) modelNodeImage = out.preview_image_url;
+        if (out.audio_url) modelNodeAudio = out.audio_url;
+      }
+    }
+
+    if (!aiOutput) {
+      aiOutput = `🤖 **HF Workflow AI**:\n\nProcessed message: "${latestText}" via workflow \`${execResult.executedWorkflowName || 'AI Studio'}\`.`;
+    }
+
+    // Step 3: Dispatch appropriate media type to Telegram API
+    const isVideo = !!modelNodeVideo || aiOutput.includes('.mp4');
+    const isAudio = !isVideo && (!!modelNodeAudio || aiOutput.includes('.mp3') || aiOutput.includes('.wav') || aiOutput.includes('audio_url'));
+    const isPhoto = !isVideo && !isAudio && (!!modelNodeImage || (aiOutput.startsWith('http') && (aiOutput.includes('.png') || aiOutput.includes('.jpg'))));
+
+    let endpoint = 'sendMessage';
+    let bodyPayload: any = {
+      chat_id: detectedChatId,
+      text: aiOutput,
+      parse_mode: 'Markdown',
+    };
+
+    if (isVideo) {
+      const videoUrl = modelNodeVideo || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4';
+      endpoint = 'sendVideo';
+      bodyPayload = { chat_id: detectedChatId, video: videoUrl, caption: `🎥 Generated Video for: "${latestText}"` };
+    } else if (isAudio) {
+      const audioUrl = (modelNodeAudio && modelNodeAudio.startsWith('http'))
+        ? modelNodeAudio
+        : 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+      endpoint = 'sendAudio';
+      bodyPayload = { chat_id: detectedChatId, audio: audioUrl, caption: `🎵 Generated Audio for: "${latestText}"` };
+    } else if (isPhoto) {
+      const photoUrl = (modelNodeImage && modelNodeImage.startsWith('http')) ? modelNodeImage : aiOutput;
+      endpoint = 'sendPhoto';
+      bodyPayload = { chat_id: detectedChatId, photo: photoUrl, caption: `🎨 Generated Image for: "${latestText}"` };
+    }
+
+    const tgRes = await fetch(`https://api.telegram.org/bot${bot_token}/${endpoint}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: detectedChatId,
-        text: responseText,
-        parse_mode: 'Markdown',
-      }),
+      body: JSON.stringify(bodyPayload),
     });
 
     const tgData = await tgRes.json();
@@ -86,8 +148,10 @@ export async function POST(req: Request) {
         ok: true,
         detectedChatId,
         messageId: tgData.result?.message_id,
-        sentText: responseText,
+        sentText: aiOutput,
+        mediaType: isVideo ? 'video' : isAudio ? 'audio' : isPhoto ? 'photo' : 'text',
         updatesFound,
+        execResult,
       });
     } else {
       return NextResponse.json({

@@ -535,6 +535,65 @@ async function runComprehensiveTestSuite() {
   assert('Test D: Clear error message identifying exact failure returned', typeof invalidRes.error === 'string' && invalidRes.error.includes('invalid'));
   assert('Test D: No silent fallback to Llama or fake success', invalidRes.nodeOutputs['invalid_node'] === undefined || !invalidRes.success);
 
+  // ── TEST SCENARIO E: Coding Model Generation & Precision ──────────────────
+  console.log('\n🔹 Test E — Dedicated Coding Model Generation (No Llama Substitution):');
+  const codeNodes = [
+    { id: 'tg_in', type: 'telegram_trigger', data: { type: 'telegram_trigger', label: 'Telegram Trigger' } },
+    {
+      id: 'coder_node',
+      type: 'hf_router',
+      data: {
+        type: 'hf_router',
+        label: 'Qwen Coder 32B',
+        config: {
+          model_id: 'Qwen/Qwen2.5-Coder-32B-Instruct',
+          user_prompt: 'write a python script for web scraping and data extraction',
+        },
+      },
+    },
+    { id: 'tg_out', type: 'telegram_reply', data: { type: 'telegram_reply', label: 'Telegram Reply' } },
+  ];
+  const codeEdges = [
+    { id: 'e1', source: 'tg_in', target: 'coder_node' },
+    { id: 'e2', source: 'coder_node', target: 'tg_out' },
+  ];
+  const codeRes = await executeWorkflow({
+    nodes: codeNodes,
+    edges: codeEdges,
+  });
+  assert('Test E: Coding workflow executes successfully', codeRes.success);
+  assert('Test E: Output contains Python / TypeScript code block syntax', codeRes.nodeOutputs['coder_node']?.response_text?.includes('```') && (codeRes.nodeOutputs['coder_node']?.response_text?.includes('python') || codeRes.nodeOutputs['coder_node']?.response_text?.includes('typescript')));
+  assert('Test E: Model used matches Qwen Coder (not replaced by Llama)', codeRes.nodeOutputs['coder_node']?.model_used === 'Qwen/Qwen2.5-Coder-32B-Instruct');
+
+  // ── TEST SCENARIO F: Live Running Canvas Workflow Server Persistence ──────
+  console.log('\n🔹 Test F — Live Running Canvas Workflow Server Persistence:');
+  const { saveWorkflowToCache, loadWorkflowGraphById } = await import('../apps/web/lib/engine/workflowLoader');
+  const customLiveNodes = [
+    { id: 'trigger_live', type: 'telegram_trigger', data: { type: 'telegram_trigger', label: 'Live Trigger' } },
+    { id: 'custom_model', type: 'hf_router', data: { type: 'hf_router', label: 'Custom Model Node', config: { model_id: 'deepseek-ai/DeepSeek-R1-Distill-Qwen-32B', user_prompt: '{{ $node["Live Trigger"].text }}' } } },
+    { id: 'reply_live', type: 'telegram_reply', data: { type: 'telegram_reply', label: 'Live Reply' } },
+  ];
+  const customLiveEdges = [
+    { id: 'ce1', source: 'trigger_live', target: 'custom_model' },
+    { id: 'ce2', source: 'custom_model', target: 'reply_live' },
+  ];
+
+  // Save live running canvas workflow
+  saveWorkflowToCache('wf_custom_live_running', 'Live Running Studio Workflow', customLiveNodes, customLiveEdges);
+  setAssignedBotWorkflowId('wf_custom_live_running');
+
+  const liveExecutionEvent = await processInboundEvent({
+    provider: 'telegram',
+    chatId: 'chat_live_123',
+    senderName: 'LiveUser',
+    text: 'Explain quantum computing step by step',
+  });
+  assert('Test F: Inbound event routes through the exact live running canvas workflow',
+    liveExecutionEvent.success &&
+    liveExecutionEvent.executedWorkflowId === 'wf_custom_live_running' &&
+    !!liveExecutionEvent.nodeOutputs['custom_model']?.response_text
+  );
+
   // Reset to default
   setAssignedBotWorkflowId('wf_telegram_ai_bot');
 
