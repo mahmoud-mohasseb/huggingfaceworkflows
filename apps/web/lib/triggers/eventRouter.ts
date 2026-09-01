@@ -14,10 +14,10 @@ export interface MessageEventPayload {
 }
 
 export async function processInboundEvent(event: MessageEventPayload) {
-  // 1. Resolve which separate workflow is assigned to process this inbound event
-  const resolvedWorkflow = resolveWorkflowForEvent(event.text, event.workflowId);
+  // 1. Resolve which separate workflow is assigned to process this inbound event (including Telegram /model session)
+  const resolvedWorkflow = resolveWorkflowForEvent(event.text, event.workflowId, event.chatId);
 
-  // Clean prompt without command prefix (e.g. "/image a cat in space" -> "a cat in space")
+  // Clean prompt without command prefix (e.g. "/image a cat in space" -> "a cat in space" or "/model zero")
   let cleanText = event.text.trim();
   const commandMatch = cleanText.match(/^(\/[a-zA-Z0-9_]+)\s*(.*)/s);
   const command = commandMatch ? commandMatch[1] : null;

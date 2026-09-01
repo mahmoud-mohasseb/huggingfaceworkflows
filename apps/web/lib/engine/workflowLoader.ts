@@ -1,6 +1,8 @@
 import { WorkflowTemplatesList, WorkflowTemplate } from '../templates';
 import { Node, Edge } from '@xyflow/react';
 import { NODE_REGISTRY } from '../nodeRegistry';
+import { getTelegramChatSession, TelegramChatSession } from '../triggers/telegramSessionStore';
+import { logModelRequest } from './diagnostics';
 
 export interface ResolvedWorkflowGraph {
   id: string;
@@ -8,6 +10,8 @@ export interface ResolvedWorkflowGraph {
   nodes: Node[];
   edges: Edge[];
   source: 'template' | 'custom' | 'canvas';
+  resolvedModelId?: string;
+  workflowBranch?: string;
 }
 
 // In-memory / runtime cache for user customized workflows
@@ -143,65 +147,129 @@ export function loadWorkflowGraphById(workflowId: string): ResolvedWorkflowGraph
  * Resolve which workflow to execute for an inbound event:
  * - If explicit workflowId passed, use it.
  * - If command prefix matches (e.g. /image, /video, /zero, /agent, /code, /music, /transcribe), route to that specialized workflow.
+ * - If Telegram chat session has a switched model, route to that workflow and apply model ID.
  * - Otherwise, use the globally assigned active workflow.
  */
-export function resolveWorkflowForEvent(text: string, explicitWorkflowId?: string): ResolvedWorkflowGraph {
+export function resolveWorkflowForEvent(
+  text: string,
+  explicitWorkflowId?: string,
+  chatId?: string
+): ResolvedWorkflowGraph {
   const trimmed = (text || '').trim();
   const lower = trimmed.toLowerCase();
 
+  let resolvedGraph: ResolvedWorkflowGraph | null = null;
+  let branch = 'text';
+  let reqType: any = 'text';
+  let targetModelId = 'meta-llama/Llama-3.3-70B-Instruct';
+
   // 1. Explicit workflow requested
   if (explicitWorkflowId) {
-    const graph = loadWorkflowGraphById(explicitWorkflowId);
-    if (graph) return graph;
+    resolvedGraph = loadWorkflowGraphById(explicitWorkflowId);
+    if (resolvedGraph) {
+      branch = explicitWorkflowId;
+    }
   }
 
   // 2. Command-based workflow routing
-  if (lower.startsWith('/zero') || lower.startsWith('/classify') || lower.startsWith('/intent')) {
-    const graph = loadWorkflowGraphById('tpl_zero_shot_router');
-    if (graph) return graph;
+  if (!resolvedGraph) {
+    if (lower.startsWith('/zero') || lower.startsWith('/classify') || lower.startsWith('/intent')) {
+      resolvedGraph = loadWorkflowGraphById('tpl_zero_shot_router');
+      branch = 'zero_shot';
+      reqType = 'zero_shot';
+      targetModelId = 'facebook/bart-large-mnli';
+    } else if (lower.startsWith('/vision') || lower.startsWith('/clip') || lower.startsWith('/photo')) {
+      resolvedGraph = loadWorkflowGraphById('tpl_zero_shot_vision_clip');
+      branch = 'vision_clip';
+      reqType = 'zero_shot';
+      targetModelId = 'openai/clip-vit-large-patch14';
+    } else if (lower.startsWith('/image') || lower.startsWith('/draw') || lower.startsWith('/flux') || lower.startsWith('/art')) {
+      resolvedGraph = loadWorkflowGraphById('tpl_whatsapp_flux_pipeline') || loadWorkflowGraphById('wf_telegram_image_gen');
+      branch = 'image_generation';
+      reqType = 'image';
+      targetModelId = 'black-forest-labs/FLUX.1-schnell';
+    } else if (lower.startsWith('/video') || lower.startsWith('/movie') || lower.startsWith('/zeroscope') || lower.startsWith('/animate')) {
+      resolvedGraph = loadWorkflowGraphById('tpl_telegram_video_gen');
+      branch = 'video_generation';
+      reqType = 'video';
+      targetModelId = 'cerspense/zeroscope_v2_576w';
+    } else if (lower.startsWith('/agent') || lower.startsWith('/openclaw') || lower.startsWith('/search') || lower.startsWith('/research')) {
+      resolvedGraph = loadWorkflowGraphById('tpl_openclaw_telegram');
+      branch = 'openclaw_agent';
+      reqType = 'agent';
+      targetModelId = 'openclaw/openclaw';
+    } else if (lower.startsWith('/code') || lower.startsWith('/dev') || lower.startsWith('/python')) {
+      resolvedGraph = loadWorkflowGraphById('tpl_deepseek_code_assistant');
+      branch = 'code_assistant';
+      reqType = 'text';
+      targetModelId = 'Qwen/Qwen2.5-Coder-32B-Instruct';
+    } else if (lower.startsWith('/voice') || lower.startsWith('/transcribe') || lower.startsWith('/whisper')) {
+      resolvedGraph = loadWorkflowGraphById('tpl_whisper_voice_pipeline');
+      branch = 'speech_transcription';
+      reqType = 'audio';
+      targetModelId = 'openai/whisper-large-v3';
+    }
   }
 
-  if (lower.startsWith('/vision') || lower.startsWith('/clip') || lower.startsWith('/photo')) {
-    const graph = loadWorkflowGraphById('tpl_zero_shot_vision_clip');
-    if (graph) return graph;
+  // 3. Telegram Session Model Resolution
+  if (!resolvedGraph && chatId) {
+    const session = getTelegramChatSession(chatId);
+    if (session && session.workflowId) {
+      resolvedGraph = loadWorkflowGraphById(session.workflowId);
+      if (resolvedGraph) {
+        branch = session.workflowType;
+        reqType = session.workflowType === 'video' ? 'video' : session.workflowType === 'image' ? 'image' : session.workflowType === 'zero' ? 'zero_shot' : 'text';
+        targetModelId = session.selectedModelId;
+      }
+    }
   }
 
-  if (lower.startsWith('/image') || lower.startsWith('/draw') || lower.startsWith('/flux') || lower.startsWith('/art')) {
-    const graph = loadWorkflowGraphById('wf_telegram_image_gen') || loadWorkflowGraphById('tpl_whatsapp_image_gen');
-    if (graph) return graph;
+  // 4. Fallback to active assigned workflow
+  if (!resolvedGraph) {
+    const assignedId = getAssignedBotWorkflowId();
+    resolvedGraph = loadWorkflowGraphById(assignedId);
+    if (resolvedGraph) {
+      branch = assignedId;
+    }
   }
 
-  if (lower.startsWith('/video') || lower.startsWith('/movie') || lower.startsWith('/zeroscope') || lower.startsWith('/animate')) {
-    const graph = loadWorkflowGraphById('tpl_telegram_video_gen');
-    if (graph) return graph;
+  // 5. Default baseline template
+  if (!resolvedGraph) {
+    resolvedGraph = loadWorkflowGraphById('tpl_hf_free_all_ai') || {
+      id: 'default_workflow',
+      name: 'Default Bot Workflow',
+      nodes: WorkflowTemplatesList[0]?.nodes || [],
+      edges: WorkflowTemplatesList[0]?.edges || [],
+      source: 'template',
+    };
   }
 
-  if (lower.startsWith('/agent') || lower.startsWith('/openclaw') || lower.startsWith('/search') || lower.startsWith('/research')) {
-    const graph = loadWorkflowGraphById('tpl_openclaw_telegram');
-    if (graph) return graph;
+  // Update target model ID on model nodes in graph if specific model was requested
+  if (targetModelId) {
+    resolvedGraph.nodes.forEach((n) => {
+      const type = (n.data as any)?.type || n.type;
+      if (type === 'hf_router' || type === 'hf_video_gen' || type === 'hf_image_gen' || type === 'hf_zero_shot') {
+        if ((n.data as any)?.config) {
+          (n.data as any).config.model_id = targetModelId;
+        }
+      }
+    });
   }
 
-  if (lower.startsWith('/code') || lower.startsWith('/dev') || lower.startsWith('/python')) {
-    const graph = loadWorkflowGraphById('tpl_deepseek_code_assistant');
-    if (graph) return graph;
-  }
+  resolvedGraph.resolvedModelId = targetModelId;
+  resolvedGraph.workflowBranch = branch;
 
-  if (lower.startsWith('/voice') || lower.startsWith('/transcribe') || lower.startsWith('/whisper')) {
-    const graph = loadWorkflowGraphById('tpl_whisper_voice_pipeline');
-    if (graph) return graph;
-  }
+  // Log structured diagnostic request
+  logModelRequest({
+    type: reqType,
+    requestedModel: targetModelId || 'default',
+    resolvedModel: targetModelId,
+    provider: 'huggingface',
+    modelId: targetModelId,
+    workflowBranch: branch,
+    status: 'started',
+  });
 
-  // 3. Fallback to active assigned workflow
-  const assignedId = getAssignedBotWorkflowId();
-  const assignedGraph = loadWorkflowGraphById(assignedId);
-  if (assignedGraph) return assignedGraph;
-
-  // 4. Default baseline template
-  return loadWorkflowGraphById('tpl_hf_free_all_ai') || {
-    id: 'default_workflow',
-    name: 'Default Bot Workflow',
-    nodes: WorkflowTemplatesList[0]?.nodes || [],
-    edges: WorkflowTemplatesList[0]?.edges || [],
-    source: 'template',
-  };
+  return resolvedGraph;
 }
+

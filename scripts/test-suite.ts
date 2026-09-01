@@ -409,51 +409,131 @@ async function runComprehensiveTestSuite() {
 
   // 6f. Isolated Workflow Assignment & Execution
   const { setAssignedBotWorkflowId, getAssignedBotWorkflowId, resolveWorkflowForEvent } = await import('../apps/web/lib/engine/workflowLoader');
+  const { setTelegramChatModel, getTelegramChatSession } = await import('../apps/web/lib/triggers/telegramSessionStore');
 
-  // Assign Zero-Shot Intent Router
-  setAssignedBotWorkflowId('tpl_zero_shot_router');
-  assert('setAssignedBotWorkflowId assigns workflow ID to bot listener', getAssignedBotWorkflowId() === 'tpl_zero_shot_router');
+  // ── TEST SCENARIO A: Zero Video Generation ──────────────────────────────
+  console.log('\n🔹 Test A — Zero Video Generation Pipeline:');
+  const zeroVideoNodes = [
+    { id: 'tg_in', type: 'telegram_trigger', data: { type: 'telegram_trigger', label: 'Telegram Trigger' } },
+    { id: 'video_node', type: 'hf_video_gen', data: { type: 'hf_video_gen', label: 'ZeroScope Video Gen', config: { model_id: 'cerspense/zeroscope_v2_576w', user_prompt: 'Cosmic galaxy starfield voyage' } } },
+    { id: 'music_node', type: 'hf_music_gen', data: { type: 'hf_music_gen', label: 'Background Music', config: { duration_seconds: 6 } } },
+    { id: 'tg_out', type: 'telegram_reply', data: { type: 'telegram_reply', label: 'Telegram Reply' } },
+  ];
+  const zeroVideoEdges = [
+    { id: 'e1', source: 'tg_in', target: 'video_node' },
+    { id: 'e2', source: 'video_node', target: 'music_node' },
+    { id: 'e3', source: 'video_node', target: 'tg_out' },
+  ];
+  const zeroVideoRes = await executeWorkflow({
+    nodes: zeroVideoNodes,
+    edges: zeroVideoEdges,
+    userInputs: { text: 'Generate a cosmic galaxy video' },
+  });
+  assert('Test A: Zero video model executes successfully', zeroVideoRes.success);
+  assert('Test A: Output contains actual video URL (.mp4 format)', typeof zeroVideoRes.nodeOutputs['video_node']?.video_url === 'string' && zeroVideoRes.nodeOutputs['video_node']?.video_url.includes('.mp4'));
+  assert('Test A: Output is not an image disguised as video', !zeroVideoRes.nodeOutputs['video_node']?.video_url.includes('.png') && !zeroVideoRes.nodeOutputs['video_node']?.video_url.includes('.jpg'));
+  assert('Test A: Result includes optional audio track', !!zeroVideoRes.nodeOutputs['music_node']?.audio_url);
+  assert('Test A: Video flag hasVideo is set to true', zeroVideoRes.hasVideo === true);
 
-  const zeroBotEvent = await processInboundEvent({
+  // ── TEST SCENARIO B: Multiple Voices Preservation & Merging ───────────────
+  console.log('\n🔹 Test B — Multiple Voices Generation & Preservation:');
+  const multiVoiceNodes = [
+    { id: 'tg_in', type: 'telegram_trigger', data: { type: 'telegram_trigger', label: 'Telegram Trigger' } },
+    {
+      id: 'voice_node',
+      type: 'hf_speech_to_text',
+      data: {
+        type: 'hf_speech_to_text',
+        label: 'Multi-Voice Engine',
+        config: {
+          script: "Alice: Welcome to our Hugging Face AI workflow!\nBob: Thank you Alice, let us run this pipeline.\nNarrator: And so the multi-modal workflow executed flawlessly.",
+        },
+      },
+    },
+    { id: 'tg_out', type: 'telegram_reply', data: { type: 'telegram_reply', label: 'Telegram Reply' } },
+  ];
+  const multiVoiceEdges = [
+    { id: 'e1', source: 'tg_in', target: 'voice_node' },
+    { id: 'e2', source: 'voice_node', target: 'tg_out' },
+  ];
+  const multiVoiceRes = await executeWorkflow({
+    nodes: multiVoiceNodes,
+    edges: multiVoiceEdges,
+  });
+  assert('Test B: Multi-voice pipeline executes successfully', multiVoiceRes.success);
+  assert('Test B: All requested voices generated (count >= 3)', multiVoiceRes.nodeOutputs['voice_node']?.voices_count >= 3);
+  assert('Test B: All audio tracks preserved in output array', Array.isArray(multiVoiceRes.nodeOutputs['voice_node']?.audio_tracks) && multiVoiceRes.nodeOutputs['voice_node']?.audio_tracks.length >= 3);
+  assert('Test B: Individual character voice objects preserved', !!multiVoiceRes.nodeOutputs['voice_node']?.voices?.alice && !!multiVoiceRes.nodeOutputs['voice_node']?.voices?.bob);
+  assert('Test B: Composite master audio produced', typeof multiVoiceRes.nodeOutputs['voice_node']?.audio_url === 'string');
+
+  // ── TEST SCENARIO C: Telegram Model Switch (/model zero) ─────────────────
+  console.log('\n🔹 Test C — Telegram Model Switching (/model zero):');
+  const testChatId = 'chat_998877';
+
+  // 1. Initial default is Llama
+  const initSession = getTelegramChatSession(testChatId);
+  assert('Test C: Initial Telegram chat session defaults to Llama 3.3', initSession.selectedModelId === 'meta-llama/Llama-3.3-70B-Instruct');
+
+  // 2. Switch to Zero-Shot model via /model zero
+  const switchRes = setTelegramChatModel(testChatId, 'zero');
+  assert('Test C: setTelegramChatModel switches session to Zero Model', switchRes.success && switchRes.modelId === 'facebook/bart-large-mnli');
+
+  const switchedSession = getTelegramChatSession(testChatId);
+  assert('Test C: Switched session persists for chatId', switchedSession.selectedModelId === 'facebook/bart-large-mnli');
+
+  // 3. Subsequent message from this chat uses Zero model
+  const switchedBotEvent = await processInboundEvent({
     provider: 'telegram',
-    chatId: '987654321',
-    senderName: 'Customer',
-    text: 'I want a refund for my subscription renewal invoice',
+    chatId: testChatId,
+    senderName: 'SwitchUser',
+    text: 'I have a technical billing issue with my invoice',
   });
-  assert('Assigned Zero-Shot Workflow executes separately for bot messages',
-    zeroBotEvent.success &&
-    zeroBotEvent.executedWorkflowId === 'tpl_zero_shot_router' &&
-    !!zeroBotEvent.nodeOutputs['n2']?.top_label
+  assert('Test C: Subsequent generation uses Zero model (not forced to Llama)',
+    switchedBotEvent.success &&
+    switchedBotEvent.executedWorkflowId === 'tpl_zero_shot_router' &&
+    !!switchedBotEvent.nodeOutputs['n2']?.top_label
   );
 
-  // Assign ZeroScope Video Workflow
-  setAssignedBotWorkflowId('tpl_telegram_video_gen');
-  const videoBotEvent = await processInboundEvent({
+  // 4. Switch from Zero to Video (/model video)
+  const videoSwitchRes = setTelegramChatModel(testChatId, 'video');
+  assert('Test C: Telegram switches to ZeroScope Video', videoSwitchRes.success && videoSwitchRes.modelId === 'cerspense/zeroscope_v2_576w');
+
+  const videoBotChatEvent = await processInboundEvent({
     provider: 'telegram',
-    chatId: '987654321',
-    senderName: 'Director',
-    text: 'cinematic cyberpunk skyline at midnight',
+    chatId: testChatId,
+    senderName: 'VideoDirector',
+    text: 'A spaceship entering hyperdrive',
   });
-  assert('Assigned Video Workflow executes separately and returns video outputs',
-    videoBotEvent.success &&
-    videoBotEvent.executedWorkflowId === 'tpl_telegram_video_gen' &&
-    !!videoBotEvent.nodeOutputs['n2']?.video_url
+  assert('Test C: Telegram generates video via ZeroScope when switched to video',
+    videoBotChatEvent.success &&
+    videoBotChatEvent.executedWorkflowId === 'tpl_telegram_video_gen' &&
+    typeof videoBotChatEvent.nodeOutputs['n2']?.video_url === 'string' &&
+    videoBotChatEvent.nodeOutputs['n2']?.video_url.includes('.mp4')
   );
 
-  // Explicit workflowId parameter execution (WhatsApp Vision CLIP)
-  const explicitVisionEvent = await processInboundEvent({
-    provider: 'whatsapp',
-    chatId: '+1234567890',
-    senderName: 'Photographer',
-    text: 'What is in this picture?',
-    mediaUrl: 'https://images.unsplash.com/photo-1543466835-00a7907e9de1',
-    workflowId: 'tpl_zero_shot_vision_clip',
+  // ── TEST SCENARIO D: Invalid/Unavailable Zero Model Error Handling ────────
+  console.log('\n🔹 Test D — Invalid/Unavailable Zero Model Error Handling:');
+  const invalidZeroNodes = [
+    {
+      id: 'invalid_node',
+      type: 'hf_zero_shot',
+      data: {
+        type: 'hf_zero_shot',
+        label: 'Invalid Zero Model',
+        config: {
+          model_id: 'invalid/nonexistent-zero-model-xyz-999',
+          candidate_labels: 'label_a, label_b',
+        },
+      },
+    },
+  ];
+  const invalidRes = await executeWorkflow({
+    nodes: invalidZeroNodes,
+    edges: [],
   });
-  assert('Explicit workflowId parameter routes and executes target workflow graph',
-    explicitVisionEvent.success &&
-    explicitVisionEvent.executedWorkflowId === 'tpl_zero_shot_vision_clip' &&
-    !!explicitVisionEvent.nodeOutputs['n2']?.top_label
-  );
+  assert('Test D: Invalid Zero Model reports failure (success: false)', invalidRes.success === false);
+  assert('Test D: Clear error message identifying exact failure returned', typeof invalidRes.error === 'string' && invalidRes.error.includes('invalid'));
+  assert('Test D: No silent fallback to Llama or fake success', invalidRes.nodeOutputs['invalid_node'] === undefined || !invalidRes.success);
 
   // Reset to default
   setAssignedBotWorkflowId('wf_telegram_ai_bot');

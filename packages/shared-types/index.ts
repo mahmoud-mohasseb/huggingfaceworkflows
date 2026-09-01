@@ -118,6 +118,8 @@ export interface ExecutionResult {
   totalCredits: number;
   nodeOutputs: Record<string, any>;
   error?: string;
+  audioTracks?: string[];
+  hasVideo?: boolean;
 }
 
 export interface VariableRef {

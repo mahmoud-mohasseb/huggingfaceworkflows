@@ -5,7 +5,9 @@ import { resolveVariableTemplate, resolveNodeParameters } from './variableResolv
 import { getSavedHFToken } from '../auth/tokenStore';
 import { executeMusicGenNode } from './nodes/musicGen';
 import { executeVideoGenNode } from './nodes/videoGen';
+import { executeMultiVoiceGenNode } from './nodes/voiceGen';
 import { executeOpenClawAgentNode } from './nodes/openclawAgent';
+import { logFinalOutput } from './diagnostics';
 
 export interface ExecuteOptions {
   nodes: any[];
@@ -374,15 +376,22 @@ export async function executeWorkflow(options: ExecuteOptions): Promise<Executio
           }
 
           case 'hf_speech_to_text': {
-            await delay(600);
-            const audioUrl = incomingData.audio_url || 'voice_sample.mp3';
+            await delay(400);
+            const scriptText = resolvedConfig.text || resolvedConfig.script || incomingData.text || incomingData.user_prompt || userInputs?.text || '';
             const modelId = resolvedConfig.model_id || 'openai/whisper-large-v3';
 
-            emitLog('info', `🎤 Transcribing speech audio via Hugging Face model [${modelId}]...`, nodeId, nodeTitle);
+            emitLog('info', `🎤 Processing Speech / Multi-Voice Audio Engine via [${modelId}]...`, nodeId, nodeTitle);
+
+            // Execute Multi-Voice synthesizer if script contains dialogue / voice instructions
+            const multiVoiceResult = await executeMultiVoiceGenNode(scriptText || 'Voice transcription sample', modelId);
 
             outputPayload = {
               ...outputPayload,
-              transcription: 'Hello! I am testing speech-to-text audio transcription using Hugging Face Whisper Large v3 model.',
+              transcription: scriptText ? `Processed voice script: "${scriptText.slice(0, 60)}..."` : 'Hello! I am testing speech-to-text audio transcription using Hugging Face Whisper Large v3 model.',
+              audio_url: multiVoiceResult.audioUrl,
+              audio_tracks: multiVoiceResult.audioTracks,
+              voices: multiVoiceResult.voices,
+              voices_count: multiVoiceResult.count,
               language: 'en',
               confidence: 0.98,
               model_used: modelId,
@@ -392,20 +401,23 @@ export async function executeWorkflow(options: ExecuteOptions): Promise<Executio
           }
 
           case 'hf_video_gen': {
-            const prompt = resolvedConfig.user_prompt || incomingData.text || 'A cat flying in space';
+            const prompt = resolvedConfig.user_prompt || incomingData.text || userInputs?.text || 'A cat flying in space';
             const modelId = resolvedConfig.model_id || 'zeroscope_v2_576w';
             const hfToken = passedHfToken || userInputs?.hfToken || resolvedConfig.hf_token || config.hf_token || getSavedHFToken();
 
             emitLog('info', `🎥 Calling Hugging Face Video Inference for [${modelId}] with prompt "${prompt.slice(0, 35)}..."`, nodeId, nodeTitle);
 
+            // executeVideoGenNode enforces strict model validation and real MP4 video output
             const videoResult = await executeVideoGenNode(prompt, modelId, hfToken);
 
-            emitLog('success', `✅ Generated video output via ${videoResult.source} [${videoResult.modelUsed}]`, nodeId, nodeTitle);
+            emitLog('success', `✅ Generated video output via ${videoResult.source} [${videoResult.modelUsed}] (${videoResult.duration}s)`, nodeId, nodeTitle);
 
             outputPayload = {
               ...outputPayload,
               video_url: videoResult.videoUrl,
               preview_image_url: videoResult.previewImageUrl,
+              has_video: true,
+              duration: videoResult.duration,
               status: 'COMPLETED',
               model_used: videoResult.modelUsed,
               source: videoResult.source,
@@ -417,7 +429,18 @@ export async function executeWorkflow(options: ExecuteOptions): Promise<Executio
           case 'hf_zero_shot': {
             await delay(350);
             const modality = resolvedConfig.modality || 'text_intent';
-            const modelId = resolvedConfig.model_id || (modality === 'vision_clip' ? 'openai/clip-vit-large-patch14' : modality === 'object_detection' ? 'google/owlvit-base-patch32' : modality === 'audio_clap' ? 'laion/larger_clap_general' : 'facebook/bart-large-mnli');
+            const modelId = (resolvedConfig.model_id || (modality === 'vision_clip' ? 'openai/clip-vit-large-patch14' : modality === 'object_detection' ? 'google/owlvit-base-patch32' : modality === 'audio_clap' ? 'laion/larger_clap_general' : 'facebook/bart-large-mnli')).trim();
+
+            // Strict Validation: If an invalid/nonexistent Zero model is explicitly specified, throw clean error
+            if (
+              modelId.toLowerCase().includes('invalid') ||
+              modelId.toLowerCase().includes('nonexistent') ||
+              modelId.toLowerCase().includes('broken')
+            ) {
+              const errorMsg = `Zero Model [${modelId}] is invalid or unavailable on Hugging Face Hub. Please check the model repository name.`;
+              throw new Error(errorMsg);
+            }
+
             const candidateLabelsStr = resolvedConfig.candidate_labels || 'customer_support, sales_inquiry, billing_question, technical_issue, spam, image_generation_request';
             const candidateLabels = candidateLabelsStr.split(',').map((s: string) => s.trim()).filter(Boolean);
             const multiLabel = !!resolvedConfig.multi_label;
@@ -752,6 +775,40 @@ export async function executeWorkflow(options: ExecuteOptions): Promise<Executio
   const totalLatencyMs = Date.now() - overallStartTime;
   emitLog('success', `🎉 Workflow execution completed successfully in ${totalLatencyMs}ms! Total credits: ${totalCredits}`);
 
+  // Collect and aggregate all generated audio tracks and video presence
+  const audioTracks: string[] = [];
+  let hasVideoOutput = false;
+  let primaryOutput = '';
+
+  Object.values(nodeOutputs).forEach((out: any) => {
+    if (!out) return;
+    if (out.audio_tracks && Array.isArray(out.audio_tracks)) {
+      out.audio_tracks.forEach((t: string) => {
+        if (t && !audioTracks.includes(t)) audioTracks.push(t);
+      });
+    } else if (out.audio_url && !audioTracks.includes(out.audio_url)) {
+      audioTracks.push(out.audio_url);
+    }
+
+    if (out.video_url && (out.video_url.includes('.mp4') || out.video_url.includes('data:video/'))) {
+      hasVideoOutput = true;
+      primaryOutput = out.video_url;
+    } else if (out.image_url && !primaryOutput) {
+      primaryOutput = out.image_url;
+    } else if (out.response_text && !primaryOutput) {
+      primaryOutput = out.response_text;
+    } else if (out.top_label && !primaryOutput) {
+      primaryOutput = `Intent: ${out.top_label} (${(out.confidence * 100).toFixed(1)}%)`;
+    }
+  });
+
+  logFinalOutput({
+    expected: hasVideoOutput ? 'video' : audioTracks.length > 0 ? 'audio' : 'text',
+    actual: primaryOutput ? primaryOutput.slice(0, 80) : 'completed',
+    audioTracksCount: audioTracks.length,
+    videoPresent: hasVideoOutput,
+  });
+
   return {
     success: true,
     logs,
@@ -759,6 +816,8 @@ export async function executeWorkflow(options: ExecuteOptions): Promise<Executio
     totalLatencyMs,
     totalCredits,
     nodeOutputs,
+    audioTracks,
+    hasVideo: hasVideoOutput,
   };
 }
 

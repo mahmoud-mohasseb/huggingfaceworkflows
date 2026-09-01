@@ -36,7 +36,45 @@ export async function POST(req: Request) {
       return NextResponse.json({ status: 'no_chat_id' });
     }
 
-    // Process inbound message through the assigned / resolved separate workflow
+    // ── 1. Intercept /model command for dynamic session model switching ───────
+    const trimmedText = text.trim();
+    if (trimmedText.startsWith('/model')) {
+      const { setTelegramChatModel, getTelegramChatSession } = await import('../../../../lib/triggers/telegramSessionStore');
+      const modelArg = trimmedText.replace(/^\/model\s*/i, '').trim();
+
+      let switchMessage = '';
+      if (!modelArg) {
+        const currentSession = getTelegramChatSession(String(chatId));
+        switchMessage = `🤖 **Current Active Model Session**:\n- **Model ID**: \`${currentSession.selectedModelId}\`\n- **Modality**: \`${currentSession.workflowType.toUpperCase()}\`\n- **Workflow**: \`${currentSession.workflowId}\`\n\n**To switch models, send:**\n- \`/model zero\` — Zero-Shot Intent Classifier\n- \`/model video\` — ZeroScope Video Generator\n- \`/model vision\` — OpenAI CLIP Vision Classifier\n- \`/model deepseek\` — DeepSeek-R1 Reasoning LLM\n- \`/model llama\` — Meta Llama 3.3 70B\n- \`/model flux\` — FLUX.1 Image Gen\n- \`/model music\` — MusicGen Stereo\n- \`/model whisper\` — Whisper Audio Transcriber\n- \`/model <custom/model-id>\` — Custom Hugging Face Model`;
+      } else {
+        const switchResult = setTelegramChatModel(String(chatId), modelArg);
+        switchMessage = switchResult.message;
+      }
+
+      // Deliver model switch confirmation back to Telegram
+      if (botToken && botToken.includes(':') && !botToken.includes('demo_token')) {
+        try {
+          await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: chatId, text: switchMessage, parse_mode: 'Markdown' }),
+          });
+        } catch (e) {
+          console.error('Error sending model switch message:', e);
+        }
+      }
+
+      return NextResponse.json({
+        received: true,
+        provider: 'telegram',
+        action: 'model_switch',
+        chat_id: chatId,
+        inbound_text: text,
+        reply: switchMessage,
+      });
+    }
+
+    // ── 2. Process inbound message through the assigned / session workflow ─────
     const execResult = await processInboundEvent({
       provider: 'telegram',
       chatId: String(chatId),
@@ -46,6 +84,31 @@ export async function POST(req: Request) {
       hfToken,
       workflowId: requestedWorkflowId,
     });
+
+    if (!execResult.success && execResult.error) {
+      // If the workflow failed (e.g. invalid model requested), deliver explicit error without fake fallback
+      const errorReply = `❌ **Workflow Execution Error**:\n\n${execResult.error}\n\n*Please verify your model configuration or use \`/model\` to select a supported model.*`;
+      if (botToken && botToken.includes(':') && !botToken.includes('demo_token')) {
+        try {
+          await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: chatId, text: errorReply, parse_mode: 'Markdown' }),
+          });
+        } catch (e) {
+          console.error('Error sending error reply to Telegram:', e);
+        }
+      }
+
+      return NextResponse.json({
+        received: true,
+        provider: 'telegram',
+        chat_id: chatId,
+        success: false,
+        error: execResult.error,
+        execResult,
+      });
+    }
 
     // Find the primary response from the executed workflow graph
     let aiOutput = '';
