@@ -416,33 +416,65 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
                     </div>
                   ) : isLongText ? (
                     <div className="space-y-1.5">
-                      {/* Prompt Presets */}
-                      {paramKey.includes('prompt') && (
-                        <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none">
-                          <span className="text-[9px] font-bold text-violet-400 uppercase tracking-wider shrink-0 mr-1">Presets:</span>
-                          <button
-                            type="button"
-                            onClick={() => handleConfigChange(paramKey, 'Cyberpunk neon city sunset 8k resolution photorealistic cinematic digital art')}
-                            className="px-2 py-0.5 bg-slate-950 hover:bg-violet-600/30 border border-slate-800 hover:border-violet-500/50 rounded-lg text-[9px] text-slate-300 font-mono whitespace-nowrap transition-colors"
-                          >
-                            🌆 Cyberpunk
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleConfigChange(paramKey, 'An upbeat synthwave electronic music track with retro 80s arpeggiated basslines and punchy drums')}
-                            className="px-2 py-0.5 bg-slate-950 hover:bg-cyan-600/30 border border-slate-800 hover:border-cyan-500/50 rounded-lg text-[9px] text-slate-300 font-mono whitespace-nowrap transition-colors"
-                          >
-                            🎵 Synthwave
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleConfigChange(paramKey, 'A majestic cat flying through a starry space galaxy with nebula lights 4k video animation')}
-                            className="px-2 py-0.5 bg-slate-950 hover:bg-indigo-600/30 border border-slate-800 hover:border-indigo-500/50 rounded-lg text-[9px] text-slate-300 font-mono whitespace-nowrap transition-colors"
-                          >
-                            🎥 Video Motion
-                          </button>
+                      {/* Dynamic Prompt Presets from Node Schema */}
+                      {schemaItem?.presets && schemaItem.presets.length > 0 && (
+                        <div className="space-y-1 bg-slate-900/90 p-2 rounded-xl border border-slate-800">
+                          <div className="flex items-center justify-between text-[9px] font-bold text-violet-400 uppercase tracking-wider">
+                            <span>✨ Telegram & Model Presets</span>
+                            <span className="text-slate-500 font-mono">Click to Apply</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1 pt-0.5">
+                            {schemaItem.presets.map((preset: any, pIdx: number) => (
+                              <button
+                                key={pIdx}
+                                type="button"
+                                onClick={() => handleConfigChange(paramKey, preset.value)}
+                                title={preset.description || preset.value}
+                                className="px-2 py-1 bg-slate-950 hover:bg-violet-600/30 border border-slate-800 hover:border-violet-500/60 rounded-lg text-[10px] text-slate-200 font-medium whitespace-nowrap transition-all flex items-center gap-1 active:scale-95 shadow-sm"
+                              >
+                                <span className="text-violet-400 font-bold">•</span>
+                                <span>{preset.label}</span>
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       )}
+
+                      {/* Quick Telegram Trigger Variable Shortcuts */}
+                      <div className="flex items-center gap-1 overflow-x-auto pb-0.5 scrollbar-none">
+                        <span className="text-[9px] font-bold text-sky-400 uppercase tracking-wider shrink-0 mr-0.5">Telegram Vars:</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const cur = config[paramKey] || '';
+                            handleConfigChange(paramKey, cur + '{{ $node["Telegram Trigger"].text }}');
+                          }}
+                          className="px-1.5 py-0.5 bg-sky-950/50 hover:bg-sky-900/60 border border-sky-500/30 rounded text-[9px] text-sky-300 font-mono whitespace-nowrap"
+                        >
+                          + Text
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const cur = config[paramKey] || '';
+                            handleConfigChange(paramKey, cur + '{{ $node["Telegram Trigger"].sender_name }}');
+                          }}
+                          className="px-1.5 py-0.5 bg-sky-950/50 hover:bg-sky-900/60 border border-sky-500/30 rounded text-[9px] text-sky-300 font-mono whitespace-nowrap"
+                        >
+                          + Sender
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const cur = config[paramKey] || '';
+                            handleConfigChange(paramKey, cur + '{{ $node["Telegram Trigger"].chat_id }}');
+                          }}
+                          className="px-1.5 py-0.5 bg-sky-950/50 hover:bg-sky-900/60 border border-sky-500/30 rounded text-[9px] text-sky-300 font-mono whitespace-nowrap"
+                        >
+                          + Chat ID
+                        </button>
+                      </div>
+
                       <textarea
                         rows={4}
                         value={val}
@@ -453,14 +485,31 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
                       />
                     </div>
                   ) : (
-                    <input
-                      type="text"
-                      value={val}
-                      placeholder={schemaItem?.placeholder}
-                      onFocus={() => setActiveField(paramKey)}
-                      onChange={(e) => handleConfigChange(paramKey, e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-800 focus:border-violet-500/50 rounded-xl px-3 py-2 text-xs font-mono text-slate-100 focus:outline-none transition-colors"
-                    />
+                    <div className="space-y-1">
+                      {schemaItem?.presets && schemaItem.presets.length > 0 && (
+                        <div className="flex flex-wrap gap-1 pb-1">
+                          {schemaItem.presets.map((preset: any, pIdx: number) => (
+                            <button
+                              key={pIdx}
+                              type="button"
+                              onClick={() => handleConfigChange(paramKey, preset.value)}
+                              title={preset.description || preset.value}
+                              className="px-1.5 py-0.5 bg-slate-900 hover:bg-violet-600/30 border border-slate-800 hover:border-violet-500/50 rounded text-[9px] text-violet-300 font-mono transition-colors"
+                            >
+                              {preset.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <input
+                        type="text"
+                        value={val}
+                        placeholder={schemaItem?.placeholder}
+                        onFocus={() => setActiveField(paramKey)}
+                        onChange={(e) => handleConfigChange(paramKey, e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-800 focus:border-violet-500/50 rounded-xl px-3 py-2 text-xs font-mono text-slate-100 focus:outline-none transition-colors"
+                      />
+                    </div>
                   )}
                 </div>
               );

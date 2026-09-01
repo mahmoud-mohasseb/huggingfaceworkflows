@@ -34,6 +34,7 @@ export interface NodeParamSchema {
   type: 'text' | 'textarea' | 'select' | 'slider' | 'secret' | 'boolean' | 'code';
   defaultValue?: any;
   options?: { label: string; value: string }[];
+  presets?: { label: string; value: string; description?: string }[];
   min?: number;
   max?: number;
   step?: number;
@@ -56,6 +57,7 @@ export interface NodeDefinition {
   schema: NodeParamSchema[];
   defaultConfig: Record<string, any>;
   defaultSubtitle?: string;
+  promptPresets?: { label: string; field: string; value: string; category?: string }[];
 }
 
 export interface NodeData {

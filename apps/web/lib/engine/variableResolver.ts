@@ -39,12 +39,14 @@ export function resolveVariableTemplate(
     return JSON.stringify(nodeOutput);
   });
 
-  // If the resolved output is empty or whitespace only, return fallbackValue
-  if (!resolved.trim() || resolved.includes("{{")) {
+  // Strip remaining unresolved {{ $node[...] }} tags cleanly rather than overwriting whole template
+  const cleaned = resolved.replace(/\{\{\s*\$node\[.*?\](?:\.[a-zA-Z0-9_]+)?\s*\}\}/g, "").trim();
+
+  if (!cleaned) {
     return fallbackValue;
   }
 
-  return resolved;
+  return resolved.replace(/\{\{\s*\$node\[.*?\](?:\.[a-zA-Z0-9_]+)?\s*\}\}/g, "");
 }
 
 export function resolveNodeParameters(

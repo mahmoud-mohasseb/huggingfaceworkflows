@@ -17,6 +17,7 @@ export const NODE_REGISTRY: Record<NodeType, NodeDefinition> = {
       { id: 'chat_id', label: 'Chat ID', type: 'string', color: '#38bdf8' },
       { id: 'sender_name', label: 'Sender Name', type: 'string', color: '#38bdf8' },
       { id: 'text', label: 'Message Text', type: 'string', color: '#38bdf8' },
+      { id: 'media_url', label: 'Media URL', type: 'image', color: '#f43f5e' },
       { id: 'raw_event', label: 'Raw Event', type: 'object', color: '#a855f7' },
     ],
     schema: [
@@ -38,15 +39,15 @@ export const NODE_REGISTRY: Record<NodeType, NodeDefinition> = {
         id: 'listen_commands',
         label: 'Listen to Commands',
         type: 'text',
-        defaultValue: '/start, /help, /ai',
-        placeholder: '/start, /ask',
+        defaultValue: '/start, /help, /ai, /model, /video, /code, /image, /zero',
+        placeholder: '/start, /ask, /model',
         description: 'Comma separated command filters',
       },
     ],
     defaultConfig: {
       bot_token: '7910482910:AAH-x94aK_demo_token',
       webhook_url: 'https://hfworkflow.app/api/webhooks/telegram',
-      listen_commands: '/start, /help, /ai',
+      listen_commands: '/start, /help, /ai, /model, /video, /code, /image, /zero',
     },
   },
 
@@ -135,6 +136,17 @@ export const NODE_REGISTRY: Record<NodeType, NodeDefinition> = {
         ],
       },
       {
+        id: 'prompt_template',
+        label: 'Prompt Template',
+        type: 'textarea',
+        defaultValue: '{{ $node["Telegram Trigger"].text }}',
+        presets: [
+          { label: 'Telegram Text', value: '{{ $node["Telegram Trigger"].text }}', description: 'Direct inbound message' },
+          { label: 'Photorealistic Art', value: 'A masterpiece 8k photograph of {{ $node["Telegram Trigger"].text }}, sharp focus, octane render', description: 'Photo enhancement' },
+          { label: 'Cyberpunk Scene', value: 'Cyberpunk futuristic neon city with {{ $node["Telegram Trigger"].text }}, volumetric light', description: 'Sci-fi visual' },
+        ],
+      },
+      {
         id: 'guidance_scale',
         label: 'Guidance Scale (CFG)',
         type: 'slider',
@@ -162,6 +174,7 @@ export const NODE_REGISTRY: Record<NodeType, NodeDefinition> = {
     ],
     defaultConfig: {
       space_slug: 'black-forest-labs/FLUX.1-schnell',
+      prompt_template: '{{ $node["Telegram Trigger"].text }}',
       guidance_scale: 7.5,
       num_inference_steps: 4,
       seed: '42',
@@ -173,7 +186,7 @@ export const NODE_REGISTRY: Record<NodeType, NodeDefinition> = {
     title: 'HuggingFace Router',
     category: 'models',
     categoryLabel: 'Hugging Face Models',
-    description: 'Serverless API routing to top-tier LLMs hosted on Hugging Face Hub.',
+    description: 'Serverless API routing to top-tier LLMs and Coder models hosted on Hugging Face Hub.',
     iconName: 'Cpu',
     accentColor: '#a855f7', // Purple 500
     badge: 'Credits',
@@ -197,9 +210,35 @@ export const NODE_REGISTRY: Record<NodeType, NodeDefinition> = {
         defaultValue: 'meta-llama/Llama-3.3-70B-Instruct',
         options: [
           { label: 'Llama 3.3 70B Instruct (Meta)', value: 'meta-llama/Llama-3.3-70B-Instruct' },
+          { label: 'Qwen 2.5 Coder 32B (Top Coding Model)', value: 'Qwen/Qwen2.5-Coder-32B-Instruct' },
+          { label: 'DeepSeek R1 Distill Qwen 32B (Reasoning)', value: 'deepseek-ai/DeepSeek-R1-Distill-Qwen-32B' },
+          { label: 'Llama 3.2 11B Vision Instruct (Multimodal)', value: 'meta-llama/Llama-3.2-11B-Vision-Instruct' },
           { label: 'Qwen 2.5 72B Instruct (Alibaba)', value: 'Qwen/Qwen2.5-72B-Instruct' },
-          { label: 'Mixtral 8x7B Instruct (Mistral AI)', value: 'mistralai/Mixtral-8x7B-Instruct-v0.1' },
-          { label: 'DeepSeek R1 Distill Qwen 32B', value: 'deepseek-ai/DeepSeek-R1-Distill-Qwen-32B' },
+          { label: 'Mistral 7B Instruct v0.3 (Fast)', value: 'mistralai/Mistral-7B-Instruct-v0.3' },
+        ],
+      },
+      {
+        id: 'user_prompt',
+        label: 'User Prompt Template',
+        type: 'textarea',
+        defaultValue: '{{ $node["Telegram Trigger"].text }}',
+        presets: [
+          { label: 'Telegram Direct Message', value: '{{ $node["Telegram Trigger"].text }}', description: 'Direct user message' },
+          { label: 'Python / Code Solver', value: 'You are an expert software developer. Write clean, complete, runnable code to solve: {{ $node["Telegram Trigger"].text }}', description: 'Coding instructions' },
+          { label: 'Support Ticket Assistant', value: 'User "{{ $node["Telegram Trigger"].sender_name }}" asked: "{{ $node["Telegram Trigger"].text }}". Provide a helpful, professional support response.', description: 'Support agent' },
+          { label: 'DeepSeek Step-by-Step Reasoner', value: 'Analyze step-by-step with deep reasoning and solve: {{ $node["Telegram Trigger"].text }}', description: 'Reasoning chain' },
+          { label: 'Vision Scene Analyzer', value: 'Analyze this image and describe details for user prompt: {{ $node["Telegram Trigger"].text }}', description: 'Multimodal vision' },
+        ],
+      },
+      {
+        id: 'system_template',
+        label: 'System Prompt Template',
+        type: 'textarea',
+        defaultValue: 'You are an intelligent, helpful AI assistant built with Hugging Face models for Telegram automations.',
+        presets: [
+          { label: 'Telegram AI Assistant', value: 'You are a helpful, concise Telegram AI assistant powered by Hugging Face.', description: 'Concise bot' },
+          { label: 'Senior Software Engineer', value: 'You are a Senior Polyglot Software Engineer. You write production-grade, bug-free, fully commented code.', description: 'Coding specialist' },
+          { label: 'Customer Support Bot', value: 'You are a friendly, knowledgeable customer support representative. You resolve customer issues efficiently.', description: 'Customer service' },
         ],
       },
       {
@@ -227,19 +266,14 @@ export const NODE_REGISTRY: Record<NodeType, NodeDefinition> = {
         placeholder: 'hf_...',
         description: 'Optional override. Defaults to session token from /login.',
       },
-      {
-        id: 'system_template',
-        label: 'System Prompt Template',
-        type: 'textarea',
-        defaultValue: 'You are a helpful, professional customer support AI assistant powered by Hugging Face.',
-      },
     ],
     defaultConfig: {
       hf_token: '',
       model_id: 'meta-llama/Llama-3.3-70B-Instruct',
+      user_prompt: '{{ $node["Telegram Trigger"].text }}',
       temperature: 0.7,
       max_new_tokens: 1024,
-      system_template: 'You are a helpful, professional customer support AI assistant powered by Hugging Face.',
+      system_template: 'You are an intelligent, helpful AI assistant built with Hugging Face models for Telegram automations.',
     },
   },
 
@@ -281,6 +315,12 @@ export const NODE_REGISTRY: Record<NodeType, NodeDefinition> = {
         label: 'Prompt Template',
         type: 'textarea',
         defaultValue: '{{ $node["Telegram Trigger"].text }}',
+        presets: [
+          { label: 'Telegram Direct Message', value: '{{ $node["Telegram Trigger"].text }}', description: 'User input as prompt' },
+          { label: 'FLUX.1 Photorealistic 8K', value: 'A stunning 8k photorealistic image of {{ $node["Telegram Trigger"].text }}, highly detailed, professional cinematic studio lighting, shot on 35mm lens', description: 'Photorealistic render' },
+          { label: 'Cyberpunk Concept Art', value: 'Cyberpunk futuristic neon-lit concept art of {{ $node["Telegram Trigger"].text }}, volumetric smoke, high contrast, trending on ArtStation', description: 'Cyberpunk aesthetic' },
+          { label: 'Digital Anime Masterpiece', value: 'Masterpiece anime illustration of {{ $node["Telegram Trigger"].text }}, vibrant colors, Makoto Shinkai style, glowing lighting', description: 'Anime style' },
+        ],
       },
     ],
     defaultConfig: {
@@ -315,15 +355,22 @@ export const NODE_REGISTRY: Record<NodeType, NodeDefinition> = {
         defaultValue: 'facebook/musicgen-small',
         options: [
           { label: 'MusicGen Small (100% Free HF Text-to-Music)', value: 'facebook/musicgen-small' },
+          { label: 'MusicGen Medium (Higher Quality Music)', value: 'facebook/musicgen-medium' },
+          { label: 'MusicGen Stereo (Spatial Audio)', value: 'facebook/musicgen-stereo' },
           { label: 'Bark Small (100% Free HF Audio & Speech)', value: 'suno/bark-small' },
         ],
       },
       {
-        id: 'hf_token',
-        label: '🤗 HuggingFace Token (hf_...)',
-        type: 'secret',
-        placeholder: 'hf_...',
-        description: 'Optional override. Defaults to session token from /login.',
+        id: 'prompt_template',
+        label: 'Music Prompt Template',
+        type: 'textarea',
+        defaultValue: 'An upbeat synthwave electronic music track with punchy drums and retro 80s arpeggiated basslines for {{ $node["Telegram Trigger"].text }}',
+        presets: [
+          { label: 'Telegram Prompt Beat', value: 'An energetic music beat inspired by: {{ $node["Telegram Trigger"].text }} with driving bass and drums', description: 'Telegram dynamic beat' },
+          { label: 'Synthwave 80s', value: 'An upbeat synthwave electronic music track with punchy drums and retro 80s arpeggiated basslines', description: 'Retro synthwave' },
+          { label: 'Lo-Fi Chill Hop', value: 'Calm relaxing lo-fi chillhop beats with soft piano chords and warm vinyl crackle', description: 'Lo-fi chill' },
+          { label: 'Cinematic Orchestral', value: 'Epic cinematic orchestral soundtrack with dramatic strings, brass, and timpani rolls', description: 'Movie score' },
+        ],
       },
       {
         id: 'duration_seconds',
@@ -335,25 +382,26 @@ export const NODE_REGISTRY: Record<NodeType, NodeDefinition> = {
         defaultValue: 10,
       },
       {
-        id: 'prompt_template',
-        label: 'Music Prompt Template',
-        type: 'textarea',
-        defaultValue: 'An upbeat synthwave electronic music track with punchy drums and retro 80s arpeggiated basslines',
+        id: 'hf_token',
+        label: '🤗 HuggingFace Token (hf_...)',
+        type: 'secret',
+        placeholder: 'hf_...',
+        description: 'Optional override. Defaults to session token from /login.',
       },
     ],
     defaultConfig: {
       model_id: 'facebook/musicgen-small',
       duration_seconds: 10,
-      prompt_template: 'An upbeat synthwave electronic music track with punchy drums and retro 80s arpeggiated basslines',
+      prompt_template: 'An upbeat synthwave electronic music track with punchy drums and retro 80s arpeggiated basslines for {{ $node["Telegram Trigger"].text }}',
     },
   },
 
   hf_speech_to_text: {
     type: 'hf_speech_to_text',
-    title: 'HF Whisper Speech-to-Text',
+    title: 'HF Whisper Speech & Multi-Voice',
     category: 'models',
     categoryLabel: 'Hugging Face Models',
-    description: 'Transcribe voice messages, audio clips, and spoken speech into structured text using Whisper Large v3.',
+    description: 'Transcribe voice messages or synthesize multi-character speech dialogues using Whisper and neural TTS.',
     iconName: 'Sparkles',
     accentColor: '#3b82f6', // Blue 500
     badge: 'Free',
@@ -361,9 +409,12 @@ export const NODE_REGISTRY: Record<NodeType, NodeDefinition> = {
     defaultSubtitle: 'openai/whisper-large-v3',
     inputs: [
       { id: 'audio_url', label: 'Input Audio / Voice', type: 'audio', color: '#06b6d4' },
+      { id: 'script', label: 'Voice Dialogue Script', type: 'string', color: '#38bdf8' },
     ],
     outputs: [
       { id: 'transcription', label: 'Transcribed Text', type: 'string', color: '#38bdf8' },
+      { id: 'audio_url', label: 'Generated Master Audio', type: 'audio', color: '#06b6d4' },
+      { id: 'audio_tracks', label: 'All Vocal Tracks (Array)', type: 'object', color: '#a855f7' },
       { id: 'language', label: 'Detected Language', type: 'string', color: '#a855f7' },
     ],
     schema: [
@@ -378,6 +429,29 @@ export const NODE_REGISTRY: Record<NodeType, NodeDefinition> = {
         ],
       },
       {
+        id: 'script',
+        label: 'Multi-Voice Dialogue Script Template',
+        type: 'textarea',
+        defaultValue: 'Alice: Welcome {{ $node["Telegram Trigger"].sender_name }} to our AI workflow!\nBob: I will process your request right now.\nNarrator: Workflow completed successfully.',
+        presets: [
+          {
+            label: 'Telegram Multi-Character Greeting',
+            value: 'Alice: Welcome {{ $node["Telegram Trigger"].sender_name }} to our AI workflow!\nBob: I will process your request right now.\nNarrator: Workflow completed successfully.',
+            description: 'Multi-voice greeting',
+          },
+          {
+            label: 'Customer Support Dialogue',
+            value: 'Agent: Hello {{ $node["Telegram Trigger"].sender_name }}, how may I assist you with your account today?\nClient: {{ $node["Telegram Trigger"].text }}\nAgent: I understand, let me resolve that for you immediately.',
+            description: 'Customer dialogue',
+          },
+          {
+            label: 'Sci-Fi Space Mission Dialogue',
+            value: 'Commander: Launching neural processing sequence.\nAI: Systems nominal, calculating trajectory.\nNarrator: Entering hyperspace.',
+            description: 'Sci-Fi narration',
+          },
+        ],
+      },
+      {
         id: 'hf_token',
         label: '🤗 HuggingFace Token (hf_...)',
         type: 'secret',
@@ -387,6 +461,7 @@ export const NODE_REGISTRY: Record<NodeType, NodeDefinition> = {
     ],
     defaultConfig: {
       model_id: 'openai/whisper-large-v3',
+      script: 'Alice: Welcome {{ $node["Telegram Trigger"].sender_name }} to our AI workflow!\nBob: I will process your request right now.\nNarrator: Workflow completed successfully.',
       hf_token: '',
     },
   },
@@ -396,7 +471,7 @@ export const NODE_REGISTRY: Record<NodeType, NodeDefinition> = {
     title: 'HF Free Video Gen',
     category: 'models',
     categoryLabel: 'Hugging Face Models',
-    description: 'Generate MP4 video clips using Hugging Face Text-to-Video models (ZeroScope, Damo-Vilab).',
+    description: 'Generate real MP4 video clips using Hugging Face ZeroScope Text-to-Video models.',
     iconName: 'Video',
     accentColor: '#8b5cf6', // Violet 500
     badge: 'Free',
@@ -407,6 +482,8 @@ export const NODE_REGISTRY: Record<NodeType, NodeDefinition> = {
     ],
     outputs: [
       { id: 'video_url', label: 'Video MP4 URL', type: 'string', color: '#a855f7' },
+      { id: 'preview_image_url', label: 'Preview Poster URL', type: 'image', color: '#f43f5e' },
+      { id: 'duration', label: 'Duration (s)', type: 'number', color: '#f59e0b' },
       { id: 'status', label: 'Status', type: 'string', color: '#22c55e' },
     ],
     schema: [
@@ -418,14 +495,37 @@ export const NODE_REGISTRY: Record<NodeType, NodeDefinition> = {
         options: [
           { label: 'ZeroScope v2 576w (100% Free HF Text-to-Video)', value: 'zeroscope_v2_576w' },
           { label: 'Damo Vilab 1.7B (100% Free HF Text-to-Video)', value: 'damo-vilab/text-to-video-ms-1.7b' },
-          { label: 'AnimateDiff Lightning (100% Free HF Motion Video)', value: 'guoyww/animatediff-motion-adapter-v1-5-2' },
+          { label: 'AnimateDiff Lightning (100% Free HF Motion Video)', value: 'ByteDance/AnimateDiff-Lightning' },
+          { label: 'CogVideoX 2B (THUDM High Definition Video)', value: 'THUDM/CogVideoX-2b' },
         ],
       },
       {
         id: 'user_prompt',
-        label: 'Video Motion Prompt',
+        label: 'Video Motion Prompt Template',
         type: 'textarea',
-        defaultValue: '{{ $node["Telegram Trigger"].text }}',
+        defaultValue: 'Cinematic high quality video of {{ $node["Telegram Trigger"].text }}, 4k photorealistic motion, smooth frame rate',
+        presets: [
+          {
+            label: 'Telegram Inbound Prompt',
+            value: 'Cinematic high quality video of {{ $node["Telegram Trigger"].text }}, 4k photorealistic motion, smooth frame rate',
+            description: 'Direct video motion',
+          },
+          {
+            label: 'Cyberpunk Sci-Fi Voyage',
+            value: 'Cyberpunk futuristic neon space voyage with {{ $node["Telegram Trigger"].text }}, dynamic sweeping camera motion, 60fps ultra-detailed',
+            description: 'Futuristic sci-fi',
+          },
+          {
+            label: 'Epic Nature Drone Footage',
+            value: 'Breathtaking 4k drone footage of {{ $node["Telegram Trigger"].text }}, golden hour volumetric lighting, majestic landscape view',
+            description: 'Scenic landscape',
+          },
+          {
+            label: 'Slow-Motion Cinematic',
+            value: 'Cinematic slow-motion close-up of {{ $node["Telegram Trigger"].text }}, shallow depth of field, 120fps motion blur, masterpiece',
+            description: 'Slow motion',
+          },
+        ],
       },
       {
         id: 'hf_token',
@@ -437,7 +537,7 @@ export const NODE_REGISTRY: Record<NodeType, NodeDefinition> = {
     ],
     defaultConfig: {
       model_id: 'zeroscope_v2_576w',
-      user_prompt: '{{ $node["Telegram Trigger"].text }}',
+      user_prompt: 'Cinematic high quality video of {{ $node["Telegram Trigger"].text }}, 4k photorealistic motion, smooth frame rate',
       hf_token: '',
     },
   },
@@ -496,8 +596,58 @@ export const NODE_REGISTRY: Record<NodeType, NodeDefinition> = {
         id: 'candidate_labels',
         label: 'Candidate Labels (Comma separated)',
         type: 'textarea',
-        defaultValue: 'customer_support, sales_inquiry, billing_question, technical_issue, spam, image_generation_request',
+        defaultValue: 'customer_support, sales_inquiry, billing_question, technical_issue, bug_report, spam, video_generation, code_generation, image_art',
+        presets: [
+          {
+            label: 'Customer Support Router',
+            value: 'customer_support, sales_inquiry, billing_question, technical_issue, bug_report, spam',
+            description: 'Support intents',
+          },
+          {
+            label: 'Multi-Modal Media Intent',
+            value: 'video_generation, code_generation, image_art, text_question, music_creation, general_chat',
+            description: 'Media dispatch',
+          },
+          {
+            label: 'Sentiment Analysis',
+            value: 'very_positive, positive, neutral, negative, extremely_urgent',
+            description: 'Sentiment',
+          },
+          {
+            label: 'Vision CLIP Concepts',
+            value: 'receipt_invoice, error_screenshot, code_snippet, photo_portrait, nature_landscape, product_item',
+            description: 'Image concepts',
+          },
+          {
+            label: 'OWL-ViT Object Detector',
+            value: 'person, face, computer, phone, document, vehicle, text_box',
+            description: 'Objects in image',
+          },
+        ],
         description: 'Define any custom category labels, visual concepts, or object classes to evaluate.',
+      },
+      {
+        id: 'text',
+        label: 'Input Text Template',
+        type: 'textarea',
+        defaultValue: '{{ $node["Telegram Trigger"].text }}',
+        presets: [
+          { label: 'Telegram Inbound Message', value: '{{ $node["Telegram Trigger"].text }}', description: 'Direct Telegram message' },
+          { label: 'WhatsApp Message Body', value: '{{ $node["WhatsApp Trigger"].message_body }}', description: 'Direct WhatsApp message' },
+        ],
+      },
+      {
+        id: 'hypothesis_template',
+        label: 'Hypothesis Template (For Text NLI)',
+        type: 'text',
+        defaultValue: 'This Telegram user message is asking about {}.',
+        presets: [
+          { label: 'Telegram User Intent', value: 'This Telegram user message is asking about {}.', description: 'Telegram intent' },
+          { label: 'General Message Topic', value: 'This message is about {}.', description: 'General topic' },
+          { label: 'Customer Sentiment', value: 'The customer tone is {}.', description: 'Sentiment' },
+          { label: 'Image Vision Description', value: 'A photo showing a {}.', description: 'Vision hypothesis' },
+        ],
+        description: 'Template used by Natural Language Inference to test candidate hypotheses.',
       },
       {
         id: 'multi_label',
@@ -505,13 +655,6 @@ export const NODE_REGISTRY: Record<NodeType, NodeDefinition> = {
         type: 'boolean',
         defaultValue: false,
         description: 'Whether multiple candidate labels can be predicted simultaneously.',
-      },
-      {
-        id: 'hypothesis_template',
-        label: 'Hypothesis Template (For Text NLI)',
-        type: 'text',
-        defaultValue: 'This message is about {}.',
-        description: 'Template used by Natural Language Inference to test candidate hypotheses.',
       },
       {
         id: 'hf_token',
@@ -524,9 +667,10 @@ export const NODE_REGISTRY: Record<NodeType, NodeDefinition> = {
     defaultConfig: {
       modality: 'text_intent',
       model_id: 'facebook/bart-large-mnli',
-      candidate_labels: 'customer_support, sales_inquiry, billing_question, technical_issue, spam, image_generation_request',
+      candidate_labels: 'customer_support, sales_inquiry, billing_question, technical_issue, bug_report, spam, video_generation, code_generation, image_art',
+      text: '{{ $node["Telegram Trigger"].text }}',
       multi_label: false,
-      hypothesis_template: 'This message is about {}.',
+      hypothesis_template: 'This Telegram user message is asking about {}.',
       hf_token: '',
     },
   },
@@ -566,10 +710,21 @@ export const NODE_REGISTRY: Record<NodeType, NodeDefinition> = {
         ],
       },
       {
+        id: 'task_prompt',
+        label: 'Task Prompt Template',
+        type: 'textarea',
+        defaultValue: '{{ $node["Telegram Trigger"].text }}',
+        presets: [
+          { label: 'Telegram Direct Message', value: '{{ $node["Telegram Trigger"].text }}', description: 'Direct user task' },
+          { label: 'Web Research & Summary', value: 'Research the latest information on: {{ $node["Telegram Trigger"].text }} and summarize findings.', description: 'Online search' },
+          { label: 'Code Execution in Sandbox', value: 'Write and test Python code to solve: {{ $node["Telegram Trigger"].text }} in your sandbox.', description: 'Python execution' },
+        ],
+      },
+      {
         id: 'system_prompt',
         label: 'System Prompt & Guidelines',
         type: 'textarea',
-        defaultValue: 'You are OpenClaw, a helpful, autonomous AI agent hosted on Hugging Face Spaces. You solve complex user tasks step-by-step using your tools.',
+        defaultValue: 'You are OpenClaw, an autonomous AI agent hosted on Hugging Face Spaces. You solve complex user tasks step-by-step using your tools.',
       },
       {
         id: 'enable_web_search',
@@ -599,6 +754,7 @@ export const NODE_REGISTRY: Record<NodeType, NodeDefinition> = {
     ],
     defaultConfig: {
       agent_role: 'general_assistant',
+      task_prompt: '{{ $node["Telegram Trigger"].text }}',
       system_prompt: 'You are OpenClaw, an autonomous AI assistant powered by Hugging Face Spaces.',
       enable_web_search: true,
       enable_python_interpreter: true,
@@ -695,6 +851,38 @@ return {
         label: 'Response Text Template',
         type: 'textarea',
         defaultValue: '🤖 **AI Bot Response**:\n\n{{ $node["HuggingFace Router"].response_text }}',
+        presets: [
+          {
+            label: 'AI LLM Response',
+            value: '🤖 **[AI Assistant]**:\n\n{{ $node["HuggingFace Router"].response_text }}',
+            description: 'Standard text reply',
+          },
+          {
+            label: 'Zero Model Classification',
+            value: '🎯 **[Zero Model Result]**:\n• **Classification**: `{{ $node["Zero-Shot AI Classifier"].top_label }}`\n• **Confidence**: {{ $node["Zero-Shot AI Classifier"].confidence }}\n• **Status**: Active',
+            description: 'Zero model pill',
+          },
+          {
+            label: 'Generated Video MP4',
+            value: '🎥 **Generated Video** for "*{{ $node["Telegram Trigger"].text }}*":\n{{ $node["HF Free Video Gen"].video_url }}',
+            description: 'Video attachment',
+          },
+          {
+            label: 'Code Solution',
+            value: '💻 **Code Solution**:\n\n{{ $node["HuggingFace Router"].response_text }}',
+            description: 'Code snippet',
+          },
+          {
+            label: 'Generated Image / Art',
+            value: '🎨 **Generated Art** for "*{{ $node["Telegram Trigger"].text }}*":\n{{ $node["HF Free Image Gen"].image_url }}',
+            description: 'Image art',
+          },
+          {
+            label: 'Speech & Audio Track',
+            value: '🎙️ **Generated Audio**:\n{{ $node["HF Whisper Speech & Multi-Voice"].audio_url }}',
+            description: 'Audio output',
+          },
+        ],
         description: 'Supports markdown and dynamic variable pills',
       },
     ],
@@ -735,20 +923,32 @@ return {
         id: 'message_template',
         label: 'Message Body Template',
         type: 'textarea',
-        defaultValue: '✨ Generated Image from FLUX.1:\n{{ $node["Gradio Space"].image_url }}',
+        defaultValue: '✨ AI Response:\n{{ $node["HuggingFace Router"].response_text }}',
+        presets: [
+          {
+            label: 'WhatsApp Text Response',
+            value: '✨ AI Response:\n{{ $node["HuggingFace Router"].response_text }}',
+            description: 'Text answer',
+          },
+          {
+            label: 'WhatsApp Image Delivery',
+            value: '🎨 Generated Image:\n{{ $node["HF Free Image Gen"].image_url }}',
+            description: 'Image deliver',
+          },
+        ],
       },
     ],
     defaultConfig: {
       recipient_template: '{{ $node["WhatsApp Trigger"].phone_number }}',
-      message_template: '✨ Generated Image from FLUX.1:\n{{ $node["Gradio Space"].image_url }}',
+      message_template: '✨ AI Response:\n{{ $node["HuggingFace Router"].response_text }}',
     },
   },
 };
 
 export const NODE_CATEGORIES = [
-  { id: 'all', label: 'All Components', count: 7 },
+  { id: 'all', label: 'All Components', count: 8 },
   { id: 'triggers', label: 'Triggers & Webhooks', accent: '#38bdf8', count: 2 },
-  { id: 'models', label: 'AI Models (HF Hub)', accent: '#a855f7', count: 2 },
+  { id: 'models', label: 'AI Models (HF Hub)', accent: '#a855f7', count: 4 },
   { id: 'logic', label: 'Logic & Data Flow', accent: '#ec4899', count: 1 },
   { id: 'actions', label: 'Action Endpoints', accent: '#4ade80', count: 2 },
 ];
